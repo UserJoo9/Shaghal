@@ -1,0 +1,5 @@
+# مجلد يتولّد بـ setup.sh / setup.ps1 (والـ CI بيولّده لوحده)
+app/
+.dart_tool/
+build/
+*.ipa
