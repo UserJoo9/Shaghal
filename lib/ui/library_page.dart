@@ -137,34 +137,37 @@ class _Header extends ConsumerWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: Glass(
-        radius: 30,
-        padding: const EdgeInsets.fromLTRB(20, 12, 10, 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'المكتبة',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+      padding: const EdgeInsets.fromLTRB(20, 10, 16, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'المكتبة',
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                    height: 1.15,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$sortLabel · $kindLabel · $count ملف',
-                    style: const TextStyle(fontSize: 12, color: Colors.white70),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$sortLabel · $kindLabel · $count ملف',
+                  style: const TextStyle(fontSize: 13, color: Colors.white54),
+                ),
+              ],
             ),
-            IconButton(
-              icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
-              onPressed: () => _showMenu(context, sort, kind, onSelected),
-            ),
-          ],
-        ),
+          ),
+          GlassIconButton(
+            icon: Icons.more_horiz_rounded,
+            size: 46,
+            onPressed: () => _showMenu(context, sort, kind, onSelected),
+          ),
+        ],
       ),
     );
   }
@@ -409,9 +412,9 @@ class _FolderBody extends ConsumerWidget {
 
         return _scrollWatch(ref, ListView.builder(
           padding: EdgeInsets.fromLTRB(
-            12,
+            0,
             4,
-            12,
+            0,
             120 + MediaQuery.paddingOf(context).bottom,
           ),
           itemCount: folderList.length + tracks.length,
@@ -463,31 +466,29 @@ class FolderPage extends ConsumerWidget {
               Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                    child: Glass(
-                      radius: 30,
-                      padding: const EdgeInsets.fromLTRB(10, 10, 20, 10),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back_rounded),
-                            color: Colors.white,
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                              ),
+                    padding: const EdgeInsets.fromLTRB(20, 10, 16, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.4,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 12),
+                        GlassIconButton(
+                          icon: Icons.chevron_left_rounded,
+                          size: 46,
+                          iconSize: 30,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
                     ),
                   ),
                   Expanded(child: _FolderBody(path: path)),
@@ -508,6 +509,44 @@ class FolderPage extends ConsumerWidget {
   }
 }
 
+/// صف مسطّح بأسلوب iOS: من غير كروت، فاصل رفيع، وتظليل خفيف للصف الشغّال.
+class _FlatRow extends StatelessWidget {
+  const _FlatRow({required this.child, required this.onTap, this.active = false});
+  final Widget child;
+  final VoidCallback onTap;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Material(
+            color: active
+                ? Colors.white.withValues(alpha: 0.10)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                child: child,
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 88, end: 20),
+          child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.08)),
+        ),
+      ],
+    );
+  }
+}
+
 class _FolderTile extends StatelessWidget {
   const _FolderTile({required this.entry, required this.onTap});
   final _FolderEntry entry;
@@ -515,46 +554,44 @@ class _FolderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: GlassTile(
-        onTap: onTap,
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                color: Colors.white.withValues(alpha: 0.12),
-              ),
-              child: const Icon(Icons.folder_rounded, color: Colors.white),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${entry.count} ملف',
-                    style: const TextStyle(fontSize: 12, color: Colors.white60),
-                  ),
-                ],
+    return _FlatRow(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(13),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF3A6BFF), Color(0xFF1B2A6B)],
               ),
             ),
-            const Icon(Icons.chevron_left_rounded, color: Colors.white54),
-          ],
-        ),
+            child: const Icon(Icons.folder_rounded, color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${entry.count} ملف',
+                  style: const TextStyle(fontSize: 13, color: Colors.white54),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_left_rounded, color: Colors.white38),
+        ],
       ),
     );
   }
@@ -592,9 +629,9 @@ class _SectionList extends ConsumerWidget {
 
     return _scrollWatch(ref, ListView.builder(
       padding: EdgeInsets.fromLTRB(
-        12,
+        0,
         4,
-        12,
+        0,
         120 + MediaQuery.paddingOf(context).bottom,
       ),
       itemCount: rows.length,
@@ -602,7 +639,7 @@ class _SectionList extends ConsumerWidget {
         final row = rows[index];
         return switch (row) {
           _HeaderRow() => Padding(
-              padding: const EdgeInsets.fromLTRB(8, 16, 8, 6),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
               child: Text(
                 '${row.title}  ·  ${row.count}',
                 style: const TextStyle(
@@ -639,67 +676,61 @@ class _TrackTile extends ConsumerWidget {
     final active = ref.watch(
       currentItemProvider.select((v) => v.value?.path == item.path),
     );
-    final d = item.modified;
-    final date =
-        '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: GlassTile(
-        highlight: active,
-        onTap: onTap,
-        child: Row(
-          children: [
-            SizedBox(
-              width: 52,
-              height: 52,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Artwork(
-                    path: item.path,
-                    size: 52,
-                    radius: 14,
-                    isVideo: item.isVideo,
-                  ),
-                  if (active)
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: Colors.black54,
-                      ),
-                      child: const Icon(
-                        Icons.graphic_eq_rounded,
-                        color: Colors.white,
-                      ),
+    return _FlatRow(
+      active: active,
+      onTap: onTap,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 56,
+            height: 56,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Artwork(
+                  path: item.path,
+                  size: 56,
+                  radius: 13,
+                  isVideo: item.isVideo,
+                ),
+                if (active)
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(13),
+                      color: Colors.black54,
                     ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
+                    child: const Icon(Icons.graphic_eq_rounded, color: Colors.white),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${item.ext} · ${formatSize(item.size)} · $date',
-                    style: const TextStyle(fontSize: 12, color: Colors.white60),
-                  ),
-                ],
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: active ? const Color(0xFF64B5FF) : Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${item.ext.toUpperCase()} · ${formatSize(item.size)}',
+                  style: const TextStyle(fontSize: 13, color: Colors.white54),
+                ),
+              ],
+            ),
+          ),
+          if (item.isVideo)
+            const Icon(Icons.videocam_rounded, size: 18, color: Colors.white38),
+        ],
       ),
     );
   }

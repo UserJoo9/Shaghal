@@ -96,7 +96,6 @@ class FullPlayerPage extends ConsumerStatefulWidget {
 
 class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
   static const _rates = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-  double? _drag;
   int _rateIndex = 2;
 
   @override
@@ -104,12 +103,6 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
     final ctrl = ref.watch(playerProvider);
     final item = ref.watch(currentItemProvider).value;
     final playing = ref.watch(playingProvider).value ?? false;
-    final pos = ref.watch(positionProvider).value ?? Duration.zero;
-    final dur = ref.watch(durationProvider).value ?? Duration.zero;
-
-    final max = dur.inMilliseconds > 0 ? dur.inMilliseconds.toDouble() : 1.0;
-    final value = (_drag ?? pos.inMilliseconds.toDouble()).clamp(0.0, max).toDouble();
-    final shown = Duration(milliseconds: value.round());
 
     return Rtl(child: Scaffold(
       body: GlassBackground(
@@ -120,22 +113,23 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
               children: [
                 Row(
                   children: [
-                    GlassIconButton(
-                      icon: Icons.arrow_back_rounded,
-                      size: 44,
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         item?.name ?? '',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 17,
+                          fontSize: 18,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    GlassIconButton(
+                      icon: Icons.chevron_left_rounded,
+                      size: 46,
+                      iconSize: 30,
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
@@ -189,40 +183,10 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                   textDirection: TextDirection.ltr,
                   child: Column(
                     children: [
-                      Glass(
+                      const Glass(
                         radius: 28,
-                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                        child: Column(
-                          children: [
-                            Slider(
-                              value: value,
-                              min: 0,
-                              max: max,
-                              activeColor: Colors.white,
-                              inactiveColor: Colors.white24,
-                              onChanged: (v) => setState(() => _drag = v),
-                              onChangeEnd: (v) {
-                                ctrl.player
-                                    .seek(Duration(milliseconds: v.round()));
-                                setState(() => _drag = null);
-                              },
-                            ),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(formatDuration(shown),
-                                      style: const TextStyle(fontSize: 12)),
-                                  Text(formatDuration(dur),
-                                      style: const TextStyle(fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                        padding: EdgeInsets.fromLTRB(12, 6, 12, 12),
+                        child: _SeekBody(),
                       ),
                       const SizedBox(height: 18),
                       Row(
@@ -299,5 +263,68 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
         ),
       ),
     ));
+  }
+}
+
+
+/// الشريط والأوقات لوحدهم عشان تحديث الموضع (كل أجزاء من الثانية) ما يعيدش بناء
+/// باقي الصفحة والزجاج النيتيف، وده كان من أسباب الرعشة.
+class _SeekBody extends ConsumerStatefulWidget {
+  const _SeekBody();
+
+  @override
+  ConsumerState<_SeekBody> createState() => _SeekBodyState();
+}
+
+class _SeekBodyState extends ConsumerState<_SeekBody> {
+  double? _drag;
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = ref.watch(playerProvider);
+    final pos = ref.watch(positionProvider).value ?? Duration.zero;
+    final dur = ref.watch(durationProvider).value ?? Duration.zero;
+
+    final max = dur.inMilliseconds > 0 ? dur.inMilliseconds.toDouble() : 1.0;
+    final value =
+        (_drag ?? pos.inMilliseconds.toDouble()).clamp(0.0, max).toDouble();
+    final shown = Duration(milliseconds: value.round());
+
+    return Column(
+      children: [
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 4,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+            overlayShape: SliderComponentShape.noOverlay,
+            activeTrackColor: Colors.white,
+            inactiveTrackColor: Colors.white24,
+            thumbColor: Colors.white,
+          ),
+          child: Slider(
+            value: value,
+            min: 0,
+            max: max,
+            onChanged: (v) => setState(() => _drag = v),
+            onChangeEnd: (v) {
+              ctrl.player.seek(Duration(milliseconds: v.round()));
+              setState(() => _drag = null);
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(formatDuration(shown),
+                  style: const TextStyle(fontSize: 12, color: Colors.white70)),
+              Text(formatDuration(dur),
+                  style: const TextStyle(fontSize: 12, color: Colors.white70)),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

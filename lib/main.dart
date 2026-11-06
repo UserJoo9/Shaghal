@@ -53,6 +53,8 @@ class ShaghalApp extends StatelessWidget {
           surface: Colors.black,
         ),
         scaffoldBackgroundColor: Colors.black,
+        splashFactory: NoSplash.splashFactory,
+        highlightColor: Colors.white10,
       ),
       home: const LibraryPage(),
     );

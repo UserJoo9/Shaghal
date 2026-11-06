@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,45 +6,16 @@ import 'package:liquid_design/liquid_design.dart';
 
 import '../state/providers.dart';
 
-/// خلفية سودا مع أضواء ناعمة بتتحرك ببطء، ولو في أغنية شغالة بيظهر غلافها مطموس خلف كل حاجة.
-/// ده اللي بيدّي الزجاج حاجة يكسرها ويعكسها.
-class GlassBackground extends ConsumerStatefulWidget {
+/// خلفية سودا بإضاءة ملوّنة ثابتة، ولو في أغنية شغالة بيظهر غلافها مطموس خلف كل حاجة.
+/// عمداً مفيش حركة ولا blur تقيل: الخلفية بتتـrasterize مرة واحدة (RepaintBoundary)
+/// فالانتقال بين الصفحات والسكرول يفضلوا ناعمين، والزجاج لسه عنده حاجة يكسرها ويعكسها.
+class GlassBackground extends ConsumerWidget {
   const GlassBackground({super.key, this.child});
   final Widget? child;
 
-  @override
-  ConsumerState<GlassBackground> createState() => _GlassBackgroundState();
-}
-
-class _GlassBackgroundState extends ConsumerState<GlassBackground>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 40),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    ref.listenManual<bool>(scrollingProvider, (_, scrolling) {
-      if (scrolling) {
-        _c.stop();
-      } else {
-        _c.repeat();
-      }
-    });
-  }
-
-  Widget _orb(double t, int k, double phase, Color color, double alpha, double size) {
-    final a = 2 * math.pi * (k * t + phase);
+  static Widget _glow(Alignment at, Color color, double alpha, double size) {
     return Align(
-      alignment: Alignment(0.95 * math.sin(a), 0.95 * math.cos(a * 0.8 + phase * 6)),
+      alignment: at,
       child: Container(
         width: size,
         height: size,
@@ -61,7 +30,7 @@ class _GlassBackgroundState extends ConsumerState<GlassBackground>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final path = ref.watch(currentItemProvider.select((v) => v.value?.path));
     final art = path == null ? null : ref.watch(thumbProvider(path)).value;
 
@@ -70,47 +39,31 @@ class _GlassBackgroundState extends ConsumerState<GlassBackground>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // غلاف الأغنية الحالية مطموس
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 700),
-            child: art == null
-                ? const SizedBox.expand(key: ValueKey('no-art'))
-                : RepaintBoundary(
-                    key: ValueKey(art),
-                    child: Opacity(
-                      opacity: 0.42,
-                      child: ImageFiltered(
-                        imageFilter: ui.ImageFilter.blur(
-                          sigmaX: 50,
-                          sigmaY: 50,
-                          tileMode: TileMode.clamp,
-                        ),
-                        child: Image.file(
-                          File(art),
-                          fit: BoxFit.cover,
-                          cacheWidth: 200,
-                          width: double.infinity,
-                          height: double.infinity,
-                        ),
-                      ),
+          RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // غلاف الأغنية الحالية: صورة صغيرة جداً متكبّرة = طمس رخيص من غير فلتر
+                if (art != null)
+                  Opacity(
+                    opacity: 0.38,
+                    child: Image.file(
+                      File(art),
+                      key: ValueKey(art),
+                      fit: BoxFit.cover,
+                      cacheWidth: 24,
+                      filterQuality: FilterQuality.high,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
-          ),
-          // أضواء بتتحرك ببطء
-          RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: _c,
-              builder: (_, __) => Stack(
-                fit: StackFit.expand,
-                children: [
-                  _orb(_c.value, 1, 0.00, const Color(0xFF6A4DFF), 0.30, 460),
-                  _orb(_c.value, 1, 0.38, const Color(0xFF0A84FF), 0.24, 420),
-                  _orb(_c.value, 2, 0.71, const Color(0xFFFF3B8E), 0.18, 380),
-                ],
-              ),
+                _glow(const Alignment(-0.9, -0.85), const Color(0xFF6A4DFF), 0.30, 520),
+                _glow(const Alignment(1.0, -0.1), const Color(0xFF0A84FF), 0.22, 480),
+                _glow(const Alignment(-0.6, 0.95), const Color(0xFFFF3B8E), 0.16, 460),
+              ],
             ),
           ),
-          if (widget.child != null) widget.child!,
+          if (child != null) child!,
         ],
       ),
     );
