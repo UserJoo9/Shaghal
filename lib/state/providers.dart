@@ -193,21 +193,44 @@ final playerProvider = Provider<PlayerController>((ref) {
   return c;
 });
 
-final currentItemProvider = StreamProvider<MediaItem?>((ref) {
+// الـ streams بتاعة media_kit مش بتعيد آخر قيمة، فبنبدأ كل provider بالحالة الحالية
+// (وإلا الوقت والمدة بيفضلوا 00:00 لو الصفحة اتفتحت بعد ما القيمة اتبعتت).
+final currentItemProvider = StreamProvider<MediaItem?>((ref) async* {
   final c = ref.watch(playerProvider);
-  return c.player.stream.playlist.map(
-    (pl) => (pl.index >= 0 && pl.index < c.queue.length)
-        ? c.queue[pl.index]
-        : null,
-  );
+  MediaItem? at(int i) => (i >= 0 && i < c.queue.length) ? c.queue[i] : null;
+  yield at(c.player.state.playlist.index);
+  yield* c.player.stream.playlist.map((pl) => at(pl.index));
 });
 
-final playingProvider = StreamProvider<bool>(
-    (ref) => ref.watch(playerProvider).player.stream.playing);
-final positionProvider = StreamProvider<Duration>(
-    (ref) => ref.watch(playerProvider).player.stream.position);
-final durationProvider = StreamProvider<Duration>(
-    (ref) => ref.watch(playerProvider).player.stream.duration);
+final playingProvider = StreamProvider<bool>((ref) async* {
+  final pl = ref.watch(playerProvider).player;
+  yield pl.state.playing;
+  yield* pl.stream.playing;
+});
+
+final positionProvider = StreamProvider<Duration>((ref) async* {
+  final pl = ref.watch(playerProvider).player;
+  yield pl.state.position;
+  yield* pl.stream.position;
+});
+
+final durationProvider = StreamProvider<Duration>((ref) async* {
+  final pl = ref.watch(playerProvider).player;
+  yield pl.state.duration;
+  yield* pl.stream.duration;
+});
+
+/// true وقت ما المستخدم بيسكرول (الخلفية بتوقف حركتها عشان السكرول يفضل ناعم).
+class ScrollingNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void set(bool v) {
+    if (state != v) state = v;
+  }
+}
+
+final scrollingProvider =
+    NotifierProvider<ScrollingNotifier, bool>(ScrollingNotifier.new);
 
 /// مسار الصورة المصغّرة لملف (أو null). بتتولّد مرة واحدة وبتتخزّن.
 final thumbProvider = FutureProvider.family<String?, String>(

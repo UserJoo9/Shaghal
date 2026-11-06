@@ -43,7 +43,9 @@ class MiniPlayer extends ConsumerWidget {
     final ctrl = ref.watch(playerProvider);
     if (item == null) return const SizedBox.shrink();
 
+    // opaque: المنطقة الشفافة/الـ platform view بتخلّي اللمس يعدّي للقايمة اللي وراها
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => openFullPlayer(context),
       child: Glass(
         radius: 34,
@@ -182,101 +184,109 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                             )),
                 ),
                 const SizedBox(height: 16),
-                Glass(
-                  radius: 36,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                // الشريط والأزرار دايماً LTR: السابق شمال والتالي يمين، والتقدّم من الشمال لليمين.
+                Directionality(
+                  textDirection: TextDirection.ltr,
                   child: Column(
                     children: [
-                      Slider(
-                        value: value,
-                        min: 0,
-                        max: max,
-                        activeColor: Colors.white,
-                        inactiveColor: Colors.white24,
-                        onChanged: (v) => setState(() => _drag = v),
-                        onChangeEnd: (v) {
-                          ctrl.player.seek(Duration(milliseconds: v.round()));
-                          setState(() => _drag = null);
-                        },
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Glass(
+                        radius: 28,
+                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                        child: Column(
                           children: [
-                            Text(formatDuration(shown),
-                                style: const TextStyle(fontSize: 12)),
-                            Text(formatDuration(dur),
-                                style: const TextStyle(fontSize: 12)),
+                            Slider(
+                              value: value,
+                              min: 0,
+                              max: max,
+                              activeColor: Colors.white,
+                              inactiveColor: Colors.white24,
+                              onChanged: (v) => setState(() => _drag = v),
+                              onChangeEnd: (v) {
+                                ctrl.player
+                                    .seek(Duration(milliseconds: v.round()));
+                                setState(() => _drag = null);
+                              },
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(formatDuration(shown),
+                                      style: const TextStyle(fontSize: 12)),
+                                  Text(formatDuration(dur),
+                                      style: const TextStyle(fontSize: 12)),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 18),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          IconButton(
-                            iconSize: 34,
-                            color: Colors.white,
-                            icon: const Icon(Icons.skip_previous_rounded),
+                          GlassIconButton(
+                            icon: Icons.skip_previous_rounded,
+                            size: 54,
+                            iconSize: 30,
                             onPressed: ctrl.player.previous,
                           ),
-                          IconButton(
-                            iconSize: 30,
-                            color: Colors.white,
-                            icon: const Icon(Icons.replay_10_rounded),
+                          GlassIconButton(
+                            icon: Icons.replay_10_rounded,
+                            size: 54,
+                            iconSize: 28,
                             onPressed: () => ctrl.player.seek(
                               ctrl.player.state.position -
                                   const Duration(seconds: 10),
                             ),
                           ),
-                          GestureDetector(
-                            onTap: ctrl.player.playOrPause,
-                            child: Container(
-                              width: 68,
-                              height: 68,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                playing
-                                    ? Icons.pause_rounded
-                                    : Icons.play_arrow_rounded,
-                                size: 38,
-                                color: Colors.black,
-                              ),
-                            ),
+                          GlassIconButton(
+                            icon: playing
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: 76,
+                            iconSize: 42,
+                            tint: const Color(0xFF0A84FF),
+                            onPressed: ctrl.player.playOrPause,
                           ),
-                          IconButton(
-                            iconSize: 30,
-                            color: Colors.white,
-                            icon: const Icon(Icons.forward_10_rounded),
+                          GlassIconButton(
+                            icon: Icons.forward_10_rounded,
+                            size: 54,
+                            iconSize: 28,
                             onPressed: () => ctrl.player.seek(
                               ctrl.player.state.position +
                                   const Duration(seconds: 10),
                             ),
                           ),
-                          IconButton(
-                            iconSize: 34,
-                            color: Colors.white,
-                            icon: const Icon(Icons.skip_next_rounded),
+                          GlassIconButton(
+                            icon: Icons.skip_next_rounded,
+                            size: 54,
+                            iconSize: 30,
                             onPressed: ctrl.player.next,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       GestureDetector(
                         onTap: () {
                           setState(() =>
                               _rateIndex = (_rateIndex + 1) % _rates.length);
                           ctrl.player.setRate(_rates[_rateIndex]);
                         },
-                        child: Text(
-                          'السرعة ${_rates[_rateIndex]}x',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w600,
+                        child: Glass(
+                          radius: 20,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 10),
+                          child: Text(
+                            'السرعة ${_rates[_rateIndex]}x',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),

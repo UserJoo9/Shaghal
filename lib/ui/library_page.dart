@@ -296,6 +296,34 @@ Future<void> _showMenu(
   );
 }
 
+void _toast(ScaffoldMessengerState m, String text) {
+  m.showSnackBar(SnackBar(
+    behavior: SnackBarBehavior.floating,
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    content: Glass(
+      radius: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      child: Text(text),
+    ),
+  ));
+}
+
+/// بيوقّف حركة الخلفية وقت السكرول.
+Widget _scrollWatch(WidgetRef ref, Widget child) {
+  return NotificationListener<ScrollNotification>(
+    onNotification: (n) {
+      if (n is ScrollStartNotification) {
+        ref.read(scrollingProvider.notifier).set(true);
+      } else if (n is ScrollEndNotification) {
+        ref.read(scrollingProvider.notifier).set(false);
+      }
+      return false;
+    },
+    child: child,
+  );
+}
+
 Future<void> _import(
   BuildContext context,
   Future<ImportResult> Function() action,
@@ -304,14 +332,13 @@ Future<void> _import(
   try {
     final r = await action();
     if (r.copied == 0 && r.skipped == 0) return; // اتلغى
-    messenger.showSnackBar(SnackBar(
-      content: Text(
-        'تم استيراد ${r.copied} ملف'
-        '${r.skipped > 0 ? ' · اتخطّى ${r.skipped}' : ''}',
-      ),
-    ));
+    _toast(
+      messenger,
+      'تم استيراد ${r.copied} ملف'
+      '${r.skipped > 0 ? ' · اتخطّى ${r.skipped}' : ''}',
+    );
   } catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text('فشل الاستيراد: $e')));
+    _toast(messenger, 'فشل الاستيراد: $e');
   }
 }
 
@@ -380,7 +407,7 @@ class _FolderBody extends ConsumerWidget {
 
         if (folderList.isEmpty && tracks.isEmpty) return _emptyMessage;
 
-        return ListView.builder(
+        return _scrollWatch(ref, ListView.builder(
           padding: EdgeInsets.fromLTRB(
             12,
             4,
@@ -411,7 +438,7 @@ class _FolderBody extends ConsumerWidget {
               },
             );
           },
-        );
+        ));
       },
     );
   }
@@ -563,7 +590,7 @@ class _SectionList extends ConsumerWidget {
       }
     }
 
-    return ListView.builder(
+    return _scrollWatch(ref, ListView.builder(
       padding: EdgeInsets.fromLTRB(
         12,
         4,
@@ -598,7 +625,7 @@ class _SectionList extends ConsumerWidget {
             ),
         };
       },
-    );
+    ));
   }
 }
 

@@ -31,6 +31,18 @@ class _GlassBackgroundState extends ConsumerState<GlassBackground>
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual<bool>(scrollingProvider, (_, scrolling) {
+      if (scrolling) {
+        _c.stop();
+      } else {
+        _c.repeat();
+      }
+    });
+  }
+
   Widget _orb(double t, int k, double phase, Color color, double alpha, double size) {
     final a = 2 * math.pi * (k * t + phase);
     return Align(
@@ -188,8 +200,9 @@ class Rtl extends StatelessWidget {
       Directionality(textDirection: TextDirection.rtl, child: child);
 }
 
-/// صف قايمة زجاجي. بيستخدم رسم Flutter للزجاج (مش native) عشان السكرول يفضل ناعم
-/// مع عشرات الصفوف.
+/// صف قايمة بمظهر زجاجي خفيف (تدرّج شفاف + حافة + لمعة علوية) من غير ما يعمل blur/refraction
+/// لكل صف. ده اللي بيخلّي السكرول ناعم مع مئات الصفوف، والزجاج الحقيقي مخصّص
+/// للعناصر الثابتة (الهيدر، الأزرار، شريط التشغيل، القوايم).
 class GlassTile extends StatelessWidget {
   const GlassTile({
     super.key,
@@ -208,19 +221,57 @@ class GlassTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LiquidGlass(
-      renderer: LiquidGlassRenderer.flutter,
-      fallback: LiquidGlassFallback.frosted,
-      interactive: false,
-      tintColor: highlight ? const Color(0xFF0A84FF) : null,
-      tintOpacity: 0.28,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            onTap: onTap,
-            child: Padding(padding: padding, child: child),
+    final r = BorderRadius.circular(radius);
+    final base = highlight ? const Color(0xFF0A84FF) : Colors.white;
+    return RepaintBoundary(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: r,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              base.withValues(alpha: highlight ? 0.34 : 0.16),
+              base.withValues(alpha: highlight ? 0.12 : 0.04),
+            ],
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: highlight ? 0.40 : 0.20),
+            width: 0.8,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: r,
+          child: Stack(
+            children: [
+              Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  onTap: onTap,
+                  child: Padding(padding: padding, child: child),
+                ),
+              ),
+              // لمعة رفيعة على الحافة العلوية
+              Positioned(
+                top: 0,
+                left: radius,
+                right: radius,
+                height: 1,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withValues(alpha: 0),
+                          Colors.white.withValues(alpha: 0.55),
+                          Colors.white.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
