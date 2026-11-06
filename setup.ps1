@@ -5,9 +5,15 @@ $ErrorActionPreference = 'Stop'
 
 flutter create --platforms=windows,ios --project-name shaghal --org com.yalkhodary app
 Copy-Item -Recurse -Force .\lib\* .\app\lib\
+New-Item -ItemType Directory -Force .\app\assets\icon | Out-Null
+Copy-Item -Force .\assets\icon\icon.png .\app\assets\icon\icon.png
+Copy-Item -Force .\flutter_launcher_icons.yaml .\app\
 Set-Location app
 
 flutter pub add flutter_riverpod media_kit media_kit_video media_kit_libs_video path_provider path file_picker:^10.0.0
+
+flutter pub add --dev flutter_launcher_icons
+dart run flutter_launcher_icons
 
 # إعدادات iOS (مشاركة الملفات + الصوت في الخلفية) عشان الـ Info.plist يبقى جاهز
 $plist = Join-Path (Get-Location) 'ios\Runner\Info.plist'

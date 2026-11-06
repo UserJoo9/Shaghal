@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../models/media_item.dart';
 import '../services/importer.dart' show ImportResult;
@@ -27,6 +28,7 @@ class LibraryPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sections = ref.watch(sectionsProvider);
+    final sort = ref.watch(sortModeProvider);
     final hasCurrent =
         ref.watch(currentItemProvider.select((v) => v.value != null));
 
@@ -40,12 +42,15 @@ class LibraryPage extends ConsumerWidget {
                 children: [
                   const _Header(),
                   Expanded(
-                    child: sections.when(
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Center(child: Text('حصل خطأ: $e')),
-                      data: (data) => _SectionList(sections: data),
-                    ),
+                    child: sort == SortMode.folder
+                        ? const _FolderBody(path: '')
+                        : sections.when(
+                            loading: () => const Center(
+                                child: CircularProgressIndicator()),
+                            error: (e, _) =>
+                                Center(child: Text('حصل خطأ: $e')),
+                            data: (data) => _SectionList(sections: data),
+                          ),
                   ),
                 ],
               ),
@@ -270,6 +275,235 @@ Future<void> _import(
     ));
   } catch (e) {
     messenger.showSnackBar(SnackBar(content: Text('فشل الاستيراد: $e')));
+  }
+}
+
+class _FolderEntry {
+  const _FolderEntry(this.name, this.path, this.count);
+  final String name;
+  final String path;
+  final int count;
+}
+
+const _emptyMessage = Center(
+  child: Padding(
+    padding: EdgeInsets.all(32),
+    child: Text(
+      'مفيش ملفات هنا.\nدوس على ⋯ فوق ← استيراد ملفات أو فولدر عشان تضيف ميديا.',
+      textAlign: TextAlign.center,
+      style: TextStyle(height: 1.7, color: Colors.white70),
+    ),
+  ),
+);
+
+/// محتوى فولدر: الفولدرات الفرعية الأول، وبعدها الأغاني اللي جواه مباشرة.
+class _FolderBody extends ConsumerWidget {
+  const _FolderBody({required this.path});
+  final String path; // فاضي = الجذر
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lib = ref.watch(libraryProvider);
+    final kind = ref.watch(kindFilterProvider);
+
+    return lib.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('حصل خطأ: $e')),
+      data: (all) {
+        final target = path.isEmpty ? const <String>[] : p.split(path);
+        final folders = <String, _FolderEntry>{};
+        final tracks = <MediaItem>[];
+
+        for (final i in all) {
+          if (kind == KindFilter.audio && i.isVideo) continue;
+          if (kind == KindFilter.video && !i.isVideo) continue;
+          final parts = i.folder.isEmpty ? const <String>[] : p.split(i.folder);
+          if (parts.length < target.length) continue;
+          var inside = true;
+          for (var k = 0; k < target.length; k++) {
+            if (parts[k] != target[k]) {
+              inside = false;
+              break;
+            }
+          }
+          if (!inside) continue;
+          if (parts.length == target.length) {
+            tracks.add(i);
+          } else {
+            final fp = p.joinAll(parts.sublist(0, target.length + 1));
+            final old = folders[fp];
+            folders[fp] =
+                _FolderEntry(parts[target.length], fp, (old?.count ?? 0) + 1);
+          }
+        }
+
+        final folderList = folders.values.toList()
+          ..sort((a, b) => naturalCompare(a.name, b.name));
+        tracks.sort((a, b) => naturalCompare(a.name, b.name));
+
+        if (folderList.isEmpty && tracks.isEmpty) return _emptyMessage;
+
+        return ListView.builder(
+          padding: EdgeInsets.fromLTRB(
+            12,
+            4,
+            12,
+            120 + MediaQuery.paddingOf(context).bottom,
+          ),
+          itemCount: folderList.length + tracks.length,
+          itemBuilder: (context, index) {
+            if (index < folderList.length) {
+              final f = folderList[index];
+              return _FolderTile(
+                entry: f,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => FolderPage(path: f.path, title: f.name),
+                  ),
+                ),
+              );
+            }
+            final t = index - folderList.length;
+            final item = tracks[t];
+            return _TrackTile(
+              key: ValueKey(item.path),
+              item: item,
+              onTap: () async {
+                await ref.read(playerProvider).playQueue(tracks, t);
+                if (item.isVideo && context.mounted) openFullPlayer(context);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class FolderPage extends ConsumerWidget {
+  const FolderPage({super.key, required this.path, required this.title});
+  final String path;
+  final String title;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasCurrent =
+        ref.watch(currentItemProvider.select((v) => v.value != null));
+
+    return Scaffold(
+      body: GlassBackground(
+        child: SafeArea(
+          bottom: false,
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                    child: Glass(
+                      radius: 30,
+                      padding: const EdgeInsets.fromLTRB(10, 10, 20, 10),
+                      child: Row(
+                        children: [
+                          GlassIconButton(
+                            icon: Icons.arrow_back_rounded,
+                            size: 44,
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(child: _FolderBody(path: path)),
+                ],
+              ),
+              if (hasCurrent)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: MediaQuery.paddingOf(context).bottom + 8,
+                  child: const MiniPlayer(),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FolderTile extends StatelessWidget {
+  const _FolderTile({required this.entry, required this.onTap});
+  final _FolderEntry entry;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    color: Colors.white.withValues(alpha: 0.14),
+                  ),
+                  child: const Icon(Icons.folder_rounded, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${entry.count} ملف',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white60,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_left_rounded, color: Colors.white54),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

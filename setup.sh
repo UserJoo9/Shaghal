@@ -5,9 +5,15 @@ set -euo pipefail
 
 flutter create --platforms=ios --project-name shaghal --org com.yalkhodary app
 cp -R lib/. app/lib/
+mkdir -p app/assets/icon
+cp assets/icon/icon.png app/assets/icon/icon.png
+cp flutter_launcher_icons.yaml app/
 cd app
 
 flutter pub add flutter_riverpod media_kit media_kit_video media_kit_libs_ios_video path_provider path file_picker:^10.0.0
+
+flutter pub add --dev flutter_launcher_icons
+dart run flutter_launcher_icons
 
 PLIST=ios/Runner/Info.plist
 PB=/usr/libexec/PlistBuddy
