@@ -1,17 +1,30 @@
-# Shaghal - شغل
+<p align="center">
+  <img src="assets/icon/icon.png" width="128" alt="Shaghal icon" />
+</p>
 
-**English** · [العربية](README.ar.md)
+<h1 align="center">Shaghal - شغل</h1>
+
+<p align="center"><b>English</b> · <a href="README.ar.md">العربية</a></p>
 
 A black, Liquid Glass audio and video player for iPhone, built with Flutter. It plays almost any format, including `.opus`, and it organizes your library the way you actually keep it: **one folder per artist**.
 
 > **Status: early / experimental.** The code has been written and iterated quickly, but not every feature has been tested on a device yet. Expect rough edges and please open an issue when you hit one.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/library.png" width="23%" alt="Library" />
+  <img src="docs/screenshots/folder.png" width="23%" alt="Folder" />
+  <img src="docs/screenshots/player.png" width="23%" alt="Player" />
+  <img src="docs/screenshots/menu.png" width="23%" alt="Menu" />
+</p>
 
 ## Features
 
 - **Plays (almost) everything.** Powered by [media_kit](https://pub.dev/packages/media_kit) (libmpv / FFmpeg), so formats Apple's AVPlayer refuses, such as Opus, MKV, FLAC, OGG and WebM, play without conversion.
 - **Folder-first library.** The home screen lists your folders (artists). Tap one to see its tracks. Nested folders work too. You can also sort flat by **date** or **name**, and filter by **audio / video**.
 - **Real Liquid Glass.** On iOS 26+ the header, mini player and player controls use Apple's native glass effect (via [liquid_design](https://pub.dev/packages/liquid_design)). On older iOS versions it falls back to a frosted blur.
-- **Black, OLED-friendly theme** with a slow ambient background that picks up the blurred cover art of the current track.
+- **Black, OLED-friendly theme** with a soft colored glow that picks up the blurred cover art of the current track.
 - **Thumbnails.** Embedded cover art for audio files, and a frame preview for videos. Thumbnails are generated lazily and cached on disk. Files without art get a stable gradient.
 - **Control Center and lock screen controls.** Play, pause, next, previous and seeking, with title, artist (taken from the folder name) and artwork. Headphone buttons work, and playback pauses on calls or when headphones are unplugged.
 - **Background playback.**
