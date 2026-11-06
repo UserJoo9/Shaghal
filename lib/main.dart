@@ -44,7 +44,7 @@ class ShaghalApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Shaghal',
+      title: 'Shaghal - شغل',
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,

@@ -23,6 +23,8 @@ $PB -c "Add :LSSupportsOpeningDocumentsInPlace bool true" "$PLIST" || true
 # تشغيل الصوت في الخلفية
 $PB -c "Add :UIBackgroundModes array" "$PLIST" || true
 $PB -c "Add :UIBackgroundModes:0 string audio" "$PLIST" || true
+# اسم التطبيق تحت الأيقونة
+$PB -c "Set :CFBundleDisplayName 'Shaghal - شغل'" "$PLIST" || $PB -c "Add :CFBundleDisplayName string 'Shaghal - شغل'" "$PLIST"
 
 # media_kit محتاج iOS 13 على الأقل
 sed -i '' "s/^# *platform :ios.*/platform :ios, '13.0'/" ios/Podfile || true

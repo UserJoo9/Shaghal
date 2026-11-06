@@ -26,6 +26,11 @@ if ($xml -notmatch 'UIFileSharingEnabled') {
   [IO.File]::WriteAllText($plist, $xml, (New-Object Text.UTF8Encoding($false)))
 }
 
+# اسم التطبيق تحت الأيقونة
+$xml = [IO.File]::ReadAllText($plist)
+$xml = [regex]::Replace($xml, '(<key>CFBundleDisplayName</key>\s*<string>)[^<]*(</string>)', '${1}Shaghal - شغل${2}')
+[IO.File]::WriteAllText($plist, $xml, (New-Object Text.UTF8Encoding($false)))
+
 flutter pub get
 flutter analyze
 Write-Host "جاهز. شغّل: cd app ; flutter run -d windows"
