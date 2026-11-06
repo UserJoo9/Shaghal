@@ -10,7 +10,7 @@ cp assets/icon/icon.png app/assets/icon/icon.png
 cp flutter_launcher_icons.yaml app/
 cd app
 
-flutter pub add flutter_riverpod media_kit media_kit_video media_kit_libs_ios_video path_provider path file_picker:^10.0.0
+flutter pub add flutter_riverpod media_kit media_kit_video media_kit_libs_ios_video path_provider path file_picker:^10.0.0 audio_service audio_session
 
 flutter pub add --dev flutter_launcher_icons
 dart run flutter_launcher_icons

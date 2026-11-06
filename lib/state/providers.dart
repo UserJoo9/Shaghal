@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:io';
 
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -169,9 +170,17 @@ class PlayerController {
 
   Future<void> playQueue(List<MediaItem> items, int index) async {
     queue = items;
+    await _activateSession();
     await player.open(
       Playlist([for (final i in items) Media(i.path)], index: index),
     );
+  }
+
+  Future<void> _activateSession() async {
+    if (!(Platform.isIOS || Platform.isAndroid || Platform.isMacOS)) return;
+    try {
+      await (await AudioSession.instance).setActive(true);
+    } catch (_) {}
   }
 
   Future<void> dispose() => player.dispose();
