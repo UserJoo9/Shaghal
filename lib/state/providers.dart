@@ -9,6 +9,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/media_item.dart';
+import '../services/importer.dart' as importer;
+import '../services/importer.dart' show ImportResult;
 import '../services/library_scanner.dart';
 
 // ───────────────────────── المكتبة ─────────────────────────
@@ -20,21 +22,44 @@ class LibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   @override
   Future<List<MediaItem>> build() => _scan();
 
-  Future<List<MediaItem>> _scan() async {
-    final docs = await getApplicationDocumentsDirectory();
-    // iOS: Documents بتاع التطبيق نفسه. Windows/غيره (للتجربة): فولدر Shaghal جوّه Documents.
-    var root = docs.path;
-    if (!Platform.isIOS) {
-      root = p.join(docs.path, 'Shaghal');
-      Directory(root).createSync(recursive: true);
-    }
-    return compute(scanDirectory, root);
-  }
+  Future<List<MediaItem>> _scan() async =>
+      compute(scanDirectory, await libraryRootPath());
 
   Future<void> refresh() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(_scan);
   }
+
+  Future<ImportResult> importFiles() async {
+    final r = await importer.importFiles(await libraryRootPath());
+    await refresh();
+    return r;
+  }
+
+  Future<ImportResult> importFolder() async {
+    final r = await importer.importFolder(await libraryRootPath());
+    await refresh();
+    return r;
+  }
+}
+
+/// جذر المكتبة. iOS: Documents بتاع التطبيق (بيظهر في تطبيق «الملفات»).
+/// غيره (للتجربة على Windows): فولدر Shaghal جوّه Documents.
+Future<String> libraryRootPath() async {
+  final docs = await getApplicationDocumentsDirectory();
+  if (!Platform.isIOS) {
+    final root = p.join(docs.path, 'Shaghal');
+    Directory(root).createSync(recursive: true);
+    return root;
+  }
+  // iOS بيعرض فولدر التطبيق في «الملفات» بس لما يبقى فيه ملف، فبنحط README.
+  final readme = File(p.join(docs.path, 'README.txt'));
+  if (!readme.existsSync()) {
+    readme.writeAsStringSync(
+      'Put your music and videos here (folders are kept).\n',
+    );
+  }
+  return docs.path;
 }
 
 // ───────────────────────── الفرز والفلترة ─────────────────────────

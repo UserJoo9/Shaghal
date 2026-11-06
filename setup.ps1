@@ -7,7 +7,7 @@ flutter create --platforms=windows,ios --project-name shaghal --org com.yalkhoda
 Copy-Item -Recurse -Force .\lib\* .\app\lib\
 Set-Location app
 
-flutter pub add flutter_riverpod media_kit media_kit_video media_kit_libs_video path_provider path
+flutter pub add flutter_riverpod media_kit media_kit_video media_kit_libs_video path_provider path file_picker:^10.0.0
 
 # إعدادات iOS (مشاركة الملفات + الصوت في الخلفية) عشان الـ Info.plist يبقى جاهز
 $plist = Join-Path (Get-Location) 'ios\Runner\Info.plist'
