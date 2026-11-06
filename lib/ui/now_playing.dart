@@ -58,15 +58,17 @@ class MiniPlayer extends ConsumerWidget {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-            GlassIconButton(
-              icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              size: 44,
+            IconButton(
+              icon: Icon(
+                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                size: 30,
+              ),
+              color: Colors.white,
               onPressed: ctrl.player.playOrPause,
             ),
-            const SizedBox(width: 8),
-            GlassIconButton(
-              icon: Icons.skip_next_rounded,
-              size: 44,
+            IconButton(
+              icon: const Icon(Icons.skip_next_rounded, size: 30),
+              color: Colors.white,
               onPressed: ctrl.player.next,
             ),
           ],
@@ -184,35 +186,52 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          GlassIconButton(
-                            icon: Icons.skip_previous_rounded,
+                          IconButton(
+                            iconSize: 34,
+                            color: Colors.white,
+                            icon: const Icon(Icons.skip_previous_rounded),
                             onPressed: ctrl.player.previous,
                           ),
-                          GlassIconButton(
-                            icon: Icons.replay_10_rounded,
+                          IconButton(
+                            iconSize: 30,
+                            color: Colors.white,
+                            icon: const Icon(Icons.replay_10_rounded),
                             onPressed: () => ctrl.player.seek(
                               ctrl.player.state.position -
                                   const Duration(seconds: 10),
                             ),
                           ),
-                          GlassIconButton(
-                            icon: playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            size: 68,
-                            iconSize: 36,
-                            tint: const Color(0xFF7C4DFF),
-                            onPressed: ctrl.player.playOrPause,
+                          GestureDetector(
+                            onTap: ctrl.player.playOrPause,
+                            child: Container(
+                              width: 68,
+                              height: 68,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                playing
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                size: 38,
+                                color: Colors.black,
+                              ),
+                            ),
                           ),
-                          GlassIconButton(
-                            icon: Icons.forward_10_rounded,
+                          IconButton(
+                            iconSize: 30,
+                            color: Colors.white,
+                            icon: const Icon(Icons.forward_10_rounded),
                             onPressed: () => ctrl.player.seek(
                               ctrl.player.state.position +
                                   const Duration(seconds: 10),
                             ),
                           ),
-                          GlassIconButton(
-                            icon: Icons.skip_next_rounded,
+                          IconButton(
+                            iconSize: 34,
+                            color: Colors.white,
+                            icon: const Icon(Icons.skip_next_rounded),
                             onPressed: ctrl.player.next,
                           ),
                         ],

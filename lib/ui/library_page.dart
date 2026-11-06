@@ -173,17 +173,10 @@ class _Header extends ConsumerWidget {
                 ],
               ),
             ),
-            SizedBox(
-              width: 44,
-              height: 44,
-              child: Glass(
-                radius: 22,
-                blur: 20,
-                padding: EdgeInsets.zero,
-                child: PopupMenuButton<_Act>(
+            PopupMenuButton<_Act>(
                   icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
                   padding: EdgeInsets.zero,
-                  color: const Color(0xF21B1640),
+                  color: const Color(0xF2141414),
                   elevation: 12,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(22),
@@ -249,8 +242,6 @@ class _Header extends ConsumerWidget {
                       child: _MenuRow(Icons.refresh_rounded, 'تحديث'),
                     ),
                   ],
-                ),
-              ),
             ),
           ],
         ),
@@ -405,9 +396,9 @@ class FolderPage extends ConsumerWidget {
                       padding: const EdgeInsets.fromLTRB(10, 10, 20, 10),
                       child: Row(
                         children: [
-                          GlassIconButton(
-                            icon: Icons.arrow_back_rounded,
-                            size: 44,
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_rounded),
+                            color: Colors.white,
                             onPressed: () => Navigator.of(context).pop(),
                           ),
                           const SizedBox(width: 14),

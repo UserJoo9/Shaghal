@@ -1,69 +1,26 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'package:liquid_design/liquid_design.dart';
 
-/// خلفية ملوّنة عشان الزجاج يبان عليها.
+/// خلفية سودا (OLED). الزجاج بيبان على المحتوى اللي وراه (القايمة والفيديو).
 class GlassBackground extends StatelessWidget {
   const GlassBackground({super.key, this.child});
   final Widget? child;
 
   @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0B1026), Color(0xFF1B1140), Color(0xFF0A2A3A)],
-        ),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          const _Blob(Alignment(-0.9, -0.7), Color(0xFF7C4DFF), 340),
-          const _Blob(Alignment(1.0, -0.1), Color(0xFF00B8D4), 300),
-          const _Blob(Alignment(-0.6, 0.9), Color(0xFFFF4081), 320),
-          if (child != null) child!,
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      ColoredBox(color: Colors.black, child: child);
 }
 
-class _Blob extends StatelessWidget {
-  const _Blob(this.alignment, this.color, this.size);
-  final Alignment alignment;
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: alignment,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color.withValues(alpha: 0.55), color.withValues(alpha: 0)],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// سطح زجاجي: blur + تدرّج شفاف + حافة لامعة.
-/// استخدمه في العناصر القليلة (header، mini player، أزرار) مش في كل صف في القايمة،
-/// لأن BackdropFilter غالي.
+/// سطح Liquid Glass حقيقي: على iOS 26+ بيستخدم زجاج Apple النيتيف (UIGlassEffect)،
+/// وعلى الأقدم/غيره بيرجع لـ blur عادي.
+/// ملاحظة: متحطش Glass جوّه Glass تاني (زجاج على زجاج بيطلع وحش).
 class Glass extends StatelessWidget {
   const Glass({
     super.key,
     required this.child,
     this.radius = 28,
     this.padding = const EdgeInsets.all(12),
-    this.blur = 28,
+    this.blur = 28, // محفوظ للتوافق، النيتيف بيتحكم فيه النظام
     this.tint,
   });
 
@@ -75,47 +32,19 @@ class Glass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r = BorderRadius.circular(radius);
-    final base = tint ?? Colors.white;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: r,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 30,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
+    return LiquidGlass(
+      tintColor: tint,
+      interactive: false,
+      fallback: LiquidGlassFallback.frosted,
       child: ClipRRect(
-        borderRadius: r,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: r,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  base.withValues(alpha: 0.26),
-                  base.withValues(alpha: 0.07),
-                ],
-              ),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.38),
-                width: 0.8,
-              ),
-            ),
-            child: Padding(padding: padding, child: child),
-          ),
-        ),
+        borderRadius: BorderRadius.circular(radius),
+        child: Padding(padding: padding, child: child),
       ),
     );
   }
 }
 
+/// زر دايري زجاجي (للاستخدام لوحده، مش جوّه Glass).
 class GlassIconButton extends StatelessWidget {
   const GlassIconButton({
     super.key,
@@ -134,17 +63,19 @@ class GlassIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Glass(
-        radius: size / 2,
-        padding: EdgeInsets.zero,
-        blur: 20,
-        tint: tint,
-        child: InkResponse(
-          onTap: onPressed,
-          child: Center(child: Icon(icon, size: iconSize, color: Colors.white)),
+    return LiquidGlass(
+      tintColor: tint,
+      interactive: true,
+      fallback: LiquidGlassFallback.frosted,
+      child: ClipOval(
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onPressed,
+            child: Center(child: Icon(icon, size: iconSize, color: Colors.white)),
+          ),
         ),
       ),
     );

@@ -48,8 +48,11 @@ class ShaghalApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF7C4DFF),
-        scaffoldBackgroundColor: Colors.transparent,
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF0A84FF),
+          surface: Colors.black,
+        ),
+        scaffoldBackgroundColor: Colors.black,
       ),
       builder: (context, child) =>
           Directionality(textDirection: TextDirection.rtl, child: child!),
