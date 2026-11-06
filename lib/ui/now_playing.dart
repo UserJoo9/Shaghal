@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../state/providers.dart';
+import 'artwork.dart';
 import 'glass.dart';
 
 String formatSize(int bytes) {
@@ -27,7 +28,6 @@ String formatDuration(Duration d) {
 void openFullPlayer(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(
-      fullscreenDialog: true,
       builder: (_) => const FullPlayerPage(),
     ),
   );
@@ -47,9 +47,16 @@ class MiniPlayer extends ConsumerWidget {
       onTap: () => openFullPlayer(context),
       child: Glass(
         radius: 34,
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
         child: Row(
           children: [
+            Artwork(
+              path: item.path,
+              size: 46,
+              radius: 23,
+              isVideo: item.isVideo,
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 item.name,
@@ -102,7 +109,7 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
     final value = (_drag ?? pos.inMilliseconds.toDouble()).clamp(0.0, max).toDouble();
     final shown = Duration(milliseconds: value.round());
 
-    return Scaffold(
+    return Rtl(child: Scaffold(
       body: GlassBackground(
         child: SafeArea(
           child: Padding(
@@ -112,7 +119,7 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                 Row(
                   children: [
                     GlassIconButton(
-                      icon: Icons.keyboard_arrow_down_rounded,
+                      icon: Icons.arrow_back_rounded,
                       size: 44,
                       onPressed: () => Navigator.of(context).pop(),
                     ),
@@ -140,17 +147,39 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                             controls: NoVideoControls,
                           ),
                         )
-                      : Center(
-                          child: Glass(
-                            radius: 44,
-                            padding: const EdgeInsets.all(48),
-                            child: const Icon(
-                              Icons.music_note_rounded,
-                              size: 96,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
+                      : (item == null
+                          ? const SizedBox.shrink()
+                          : Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 340,
+                                  maxHeight: 340,
+                                ),
+                                child: AspectRatio(
+                                  aspectRatio: 1,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(36),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Colors.black54,
+                                          blurRadius: 40,
+                                          offset: Offset(0, 20),
+                                        ),
+                                      ],
+                                    ),
+                                    child: LayoutBuilder(
+                                      builder: (context, bc) => Artwork(
+                                        path: item.path,
+                                        size: bc.maxWidth,
+                                        radius: 36,
+                                        iconSize: bc.maxWidth * 0.35,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )),
                 ),
                 const SizedBox(height: 16),
                 Glass(
@@ -259,6 +288,6 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
           ),
         ),
       ),
-    );
+    ));
   }
 }

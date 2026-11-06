@@ -13,6 +13,7 @@ import '../models/media_item.dart';
 import '../services/importer.dart' as importer;
 import '../services/importer.dart' show ImportResult;
 import '../services/library_scanner.dart';
+import '../services/thumbnails.dart';
 
 // ───────────────────────── المكتبة ─────────────────────────
 
@@ -207,3 +208,8 @@ final positionProvider = StreamProvider<Duration>(
     (ref) => ref.watch(playerProvider).player.stream.position);
 final durationProvider = StreamProvider<Duration>(
     (ref) => ref.watch(playerProvider).player.stream.duration);
+
+/// مسار الصورة المصغّرة لملف (أو null). بتتولّد مرة واحدة وبتتخزّن.
+final thumbProvider = FutureProvider.family<String?, String>(
+  (ref, path) => Thumbnails.get(path),
+);

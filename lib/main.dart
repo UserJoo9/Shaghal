@@ -54,8 +54,6 @@ class ShaghalApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: Colors.black,
       ),
-      builder: (context, child) =>
-          Directionality(textDirection: TextDirection.rtl, child: child!),
       home: const LibraryPage(),
     );
   }

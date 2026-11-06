@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import '../models/media_item.dart';
 import '../services/importer.dart' show ImportResult;
 import '../state/providers.dart';
+import 'artwork.dart';
 import 'glass.dart';
 import 'now_playing.dart';
 
@@ -32,7 +33,7 @@ class LibraryPage extends ConsumerWidget {
     final hasCurrent =
         ref.watch(currentItemProvider.select((v) => v.value != null));
 
-    return Scaffold(
+    return Rtl(child: Scaffold(
       body: GlassBackground(
         child: SafeArea(
           bottom: false,
@@ -65,7 +66,7 @@ class LibraryPage extends ConsumerWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -86,21 +87,6 @@ const _sectionLabel = TextStyle(
   fontWeight: FontWeight.w700,
   color: Colors.white54,
 );
-
-class _MenuRow extends StatelessWidget {
-  const _MenuRow(this.icon, this.label);
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.white70),
-          const SizedBox(width: 12),
-          Text(label),
-        ],
-      );
-}
 
 class _Header extends ConsumerWidget {
   const _Header();
@@ -173,81 +159,141 @@ class _Header extends ConsumerWidget {
                 ],
               ),
             ),
-            PopupMenuButton<_Act>(
-                  icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
-                  padding: EdgeInsets.zero,
-                  color: const Color(0xF2141414),
-                  elevation: 12,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
-                  ),
-                  onSelected: onSelected,
-                  itemBuilder: (_) => [
-                    const PopupMenuItem<_Act>(
-                      enabled: false,
-                      height: 32,
-                      child: Text('الفرز', style: _sectionLabel),
-                    ),
-                    CheckedPopupMenuItem<_Act>(
-                      value: _Act.sortFolder,
-                      checked: sort == SortMode.folder,
-                      child: const Text('بالفولدرات'),
-                    ),
-                    CheckedPopupMenuItem<_Act>(
-                      value: _Act.sortDate,
-                      checked: sort == SortMode.date,
-                      child: const Text('بالتاريخ'),
-                    ),
-                    CheckedPopupMenuItem<_Act>(
-                      value: _Act.sortName,
-                      checked: sort == SortMode.name,
-                      child: const Text('بالاسم'),
-                    ),
-                    const PopupMenuDivider(),
-                    const PopupMenuItem<_Act>(
-                      enabled: false,
-                      height: 32,
-                      child: Text('النوع', style: _sectionLabel),
-                    ),
-                    CheckedPopupMenuItem<_Act>(
-                      value: _Act.kindAll,
-                      checked: kind == KindFilter.all,
-                      child: const Text('الكل'),
-                    ),
-                    CheckedPopupMenuItem<_Act>(
-                      value: _Act.kindAudio,
-                      checked: kind == KindFilter.audio,
-                      child: const Text('صوت'),
-                    ),
-                    CheckedPopupMenuItem<_Act>(
-                      value: _Act.kindVideo,
-                      checked: kind == KindFilter.video,
-                      child: const Text('فيديو'),
-                    ),
-                    const PopupMenuDivider(),
-                    const PopupMenuItem<_Act>(
-                      value: _Act.importFiles,
-                      child: _MenuRow(Icons.audio_file_rounded, 'استيراد ملفات'),
-                    ),
-                    const PopupMenuItem<_Act>(
-                      value: _Act.importFolder,
-                      child: _MenuRow(
-                        Icons.create_new_folder_rounded,
-                        'استيراد فولدر',
-                      ),
-                    ),
-                    const PopupMenuItem<_Act>(
-                      value: _Act.refresh,
-                      child: _MenuRow(Icons.refresh_rounded, 'تحديث'),
-                    ),
-                  ],
+            IconButton(
+              icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
+              onPressed: () => _showMenu(context, sort, kind, onSelected),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _MenuLabel extends StatelessWidget {
+  const _MenuLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 4),
+        child: Text(text, style: _sectionLabel),
+      );
+}
+
+class _MenuItem extends StatelessWidget {
+  const _MenuItem(this.label, {this.icon, this.checked = false, required this.onTap});
+  final String label;
+  final IconData? icon;
+  final bool checked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          child: Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 20, color: Colors.white70),
+                const SizedBox(width: 12),
+              ],
+              Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
+              if (checked) const Icon(Icons.check_rounded, size: 20),
+            ],
+          ),
+        ),
+      );
+}
+
+/// قايمة زجاجية (Liquid Glass) بدل قايمة Material العادية.
+Future<void> _showMenu(
+  BuildContext context,
+  SortMode sort,
+  KindFilter kind,
+  void Function(_Act) onSelected,
+) {
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'menu',
+    barrierColor: Colors.black45,
+    transitionDuration: const Duration(milliseconds: 180),
+    transitionBuilder: (ctx, anim, _, child) => FadeTransition(
+      opacity: anim,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.94, end: 1).animate(
+          CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+        ),
+        alignment: Alignment.topLeft,
+        child: child,
+      ),
+    ),
+    pageBuilder: (ctx, _, __) {
+      void pick(_Act a) {
+        Navigator.of(ctx).pop();
+        onSelected(a);
+      }
+
+      return Rtl(
+        child: SafeArea(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 64, 16, 0),
+              child: SizedBox(
+                width: 260,
+                child: Glass(
+                  radius: 28,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const _MenuLabel('الفرز'),
+                        _MenuItem('بالفولدرات',
+                            checked: sort == SortMode.folder,
+                            onTap: () => pick(_Act.sortFolder)),
+                        _MenuItem('بالتاريخ',
+                            checked: sort == SortMode.date,
+                            onTap: () => pick(_Act.sortDate)),
+                        _MenuItem('بالاسم',
+                            checked: sort == SortMode.name,
+                            onTap: () => pick(_Act.sortName)),
+                        const Divider(height: 12, color: Colors.white24),
+                        const _MenuLabel('النوع'),
+                        _MenuItem('الكل',
+                            checked: kind == KindFilter.all,
+                            onTap: () => pick(_Act.kindAll)),
+                        _MenuItem('صوت',
+                            checked: kind == KindFilter.audio,
+                            onTap: () => pick(_Act.kindAudio)),
+                        _MenuItem('فيديو',
+                            checked: kind == KindFilter.video,
+                            onTap: () => pick(_Act.kindVideo)),
+                        const Divider(height: 12, color: Colors.white24),
+                        _MenuItem('استيراد ملفات',
+                            icon: Icons.audio_file_rounded,
+                            onTap: () => pick(_Act.importFiles)),
+                        _MenuItem('استيراد فولدر',
+                            icon: Icons.create_new_folder_rounded,
+                            onTap: () => pick(_Act.importFolder)),
+                        _MenuItem('تحديث',
+                            icon: Icons.refresh_rounded,
+                            onTap: () => pick(_Act.refresh)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 Future<void> _import(
@@ -381,7 +427,7 @@ class FolderPage extends ConsumerWidget {
     final hasCurrent =
         ref.watch(currentItemProvider.select((v) => v.value != null));
 
-    return Scaffold(
+    return Rtl(child: Scaffold(
       body: GlassBackground(
         child: SafeArea(
           bottom: false,
@@ -431,7 +477,7 @@ class FolderPage extends ConsumerWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -444,54 +490,43 @@ class _FolderTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Material(
-        color: Colors.white.withValues(alpha: 0.09),
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    color: Colors.white.withValues(alpha: 0.14),
-                  ),
-                  child: const Icon(Icons.folder_rounded, color: Colors.white),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${entry.count} ملف',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white60,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_left_rounded, color: Colors.white54),
-              ],
+      child: GlassTile(
+        onTap: onTap,
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                color: Colors.white.withValues(alpha: 0.12),
+              ),
+              child: const Icon(Icons.folder_rounded, color: Colors.white),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${entry.count} ملف',
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_left_rounded, color: Colors.white54),
+          ],
         ),
       ),
     );
@@ -583,60 +618,60 @@ class _TrackTile extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Material(
-        color: Colors.white.withValues(alpha: active ? 0.20 : 0.07),
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    color: Colors.white.withValues(alpha: 0.12),
+      child: GlassTile(
+        highlight: active,
+        onTap: onTap,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Artwork(
+                    path: item.path,
+                    size: 52,
+                    radius: 14,
+                    isVideo: item.isVideo,
                   ),
-                  child: Icon(
-                    active
-                        ? Icons.graphic_eq_rounded
-                        : (item.isVideo
-                            ? Icons.movie_rounded
-                            : Icons.music_note_rounded),
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
+                  if (active)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: Colors.black54,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${item.ext} · ${formatSize(item.size)} · $date',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white60,
-                        ),
+                      child: const Icon(
+                        Icons.graphic_eq_rounded,
+                        color: Colors.white,
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                ],
+              ),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${item.ext} · ${formatSize(item.size)} · $date',
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

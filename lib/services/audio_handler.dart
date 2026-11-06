@@ -5,6 +5,7 @@ import 'package:audio_service/audio_service.dart' as svc show MediaItem;
 import 'package:audio_session/audio_session.dart';
 import 'package:path/path.dart' as p;
 
+import '../services/thumbnails.dart';
 import '../state/providers.dart' show PlayerController;
 
 /// يربط مشغّل media_kit بـ Control Center وشاشة القفل وأزرار السماعات.
@@ -42,12 +43,26 @@ class ShaghalAudioHandler extends BaseAudioHandler with SeekHandler {
     if (i < 0 || i >= _c.queue.length) return;
     final t = _c.queue[i];
     final d = _c.player.state.duration;
-    mediaItem.add(svc.MediaItem(
+    final item = svc.MediaItem(
       id: t.path,
       title: t.name,
       artist: t.folder.isEmpty ? null : p.basename(t.folder), // الفولدر = الفنان
       duration: d == Duration.zero ? null : d,
-    ));
+      artUri: _art[t.path],
+    );
+    mediaItem.add(item);
+    if (!_art.containsKey(t.path)) _loadArt(t.path, item);
+  }
+
+  final Map<String, Uri?> _art = {};
+
+  /// غلاف الأغنية في Control Center بيتحمّل بعد ما الأغنية تبدأ.
+  Future<void> _loadArt(String path, svc.MediaItem item) async {
+    final file = await Thumbnails.get(path);
+    _art[path] = file == null ? null : Uri.file(file);
+    if (file != null && mediaItem.value?.id == path) {
+      mediaItem.add(item.copyWith(artUri: _art[path]));
+    }
   }
 
   void _broadcast() {
