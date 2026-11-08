@@ -120,11 +120,21 @@ class _BottomFade extends StatelessWidget {
 }
 
 /// شريط التابات الزجاجي. المؤشر بينزلق بين التابات بحركة ارتداد خفيفة زي تطبيقات النظام.
-class _NavBar extends ConsumerWidget {
+class _NavBar extends ConsumerStatefulWidget {
   const _NavBar();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_NavBar> createState() => _NavBarState();
+}
+
+class _NavBarState extends ConsumerState<_NavBar> {
+  // التاب المختار محلياً: بيتحدّث فوراً عشان العدسة تستقر مكانها من غير ما تستنى
+  // إعادة بناء الصفحة التقيلة (وده اللي كان بيخليها ترجع ثم تروح تاني).
+  int? _local;
+  int _token = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final kind = ref.watch(kindFilterProvider);
     final s = ref.watch(stringsProvider);
 
@@ -134,7 +144,8 @@ class _NavBar extends ConsumerWidget {
       (Icons.favorite_rounded, s.t('المفضلة', 'Favorites'), KindFilter.favorites),
       (Icons.settings_rounded, s.t('الإعدادات', 'Settings'), KindFilter.settings),
     ];
-    final index = tabs.indexWhere((t) => t.$3 == kind);
+    final providerIndex = tabs.indexWhere((t) => t.$3 == kind);
+    final index = _local ?? (providerIndex < 0 ? 0 : providerIndex);
 
     // شريط التابات الجاهز من الحزمة: زجاج نيتيف + عدسة بتتسحب بالصباع بين التابات (زي الواتساب).
     // نفس عرض المشغل (هامش 12 من الجنبين).
@@ -142,7 +153,7 @@ class _NavBar extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: LiquidGlassNavigationBar(
         height: 68,
-        currentIndex: index < 0 ? 0 : index,
+        currentIndex: index,
         activeColor: context.fg,
         inactiveColor: context.fg54,
         items: [
@@ -151,7 +162,14 @@ class _NavBar extends ConsumerWidget {
         ],
         onTap: (i) {
           HapticFeedback.selectionClick();
-          ref.read(kindFilterProvider.notifier).set(tabs[i].$3);
+          final my = ++_token;
+          setState(() => _local = i);
+          // نأجّل تبديل المحتوى لحد ما حركة المؤشر تخلص، فالانتقال يبقى ناعم.
+          Future.delayed(const Duration(milliseconds: 260), () {
+            if (!mounted || my != _token) return;
+            ref.read(kindFilterProvider.notifier).set(tabs[i].$3);
+            setState(() => _local = null);
+          });
         },
       ),
     );
