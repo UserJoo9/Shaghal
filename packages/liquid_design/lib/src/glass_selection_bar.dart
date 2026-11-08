@@ -213,20 +213,36 @@ class _GlassSelectionBarState extends State<GlassSelectionBar>
 
   /// العدسة النيتيف بتتحرك مع نفس نوابض المؤشر في كل frame (motion: instant)،
   /// فمفيش قفزات ولا نوابض نيتيف منفصلة بتترجرج. الشفافية والحجم من نابض الرفع (_lift).
+  bool _lensPending = false;
+  Rect? _lastLensRect;
+  double _lastLensAlpha = -1;
+
   void _syncLens() {
     if (!_nativeLens || !_lensReady || widget.collapsed || _itemWidth <= 0) {
       return;
     }
-    final lift = _lift.value.clamp(0.0, 1.2);
-    final stretch = _reduceMotion
-        ? 0.0
-        : math.min(_pos.velocity.abs() * 0.035, 0.45);
-    final scale = 0.8 + 0.2 * lift.clamp(0.0, 1.0);
-    _lensCtl.move(
-      _lensRect(_pos.value, scale, stretch),
-      alpha: lift.clamp(0.0, 1.0),
-      motion: LensMotion.instant,
-    );
+    // أمر نيتيف واحد في الـ frame بعد ما الرسم يخلص (مش اتنين من نابض الموضع ونابض الرفع)،
+    // وبنتخطّى لو مفيش تغيير يُذكر: تغيير حجم/موضع الزجاج النيتيف مكلّف.
+    if (_lensPending) return;
+    _lensPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lensPending = false;
+      if (!mounted || !_nativeLens || !_lensReady || widget.collapsed) return;
+      final lift = _lift.value.clamp(0.0, 1.0);
+      final scale = 0.8 + 0.2 * lift;
+      // من غير تمطيط للعدسة: ثبات الحجم أرخص بكتير على الزجاج النيتيف.
+      final rect = _lensRect(_pos.value, scale, 0);
+      final last = _lastLensRect;
+      if (last != null &&
+          (last.left - rect.left).abs() < 0.1 &&
+          (last.width - rect.width).abs() < 0.1 &&
+          (_lastLensAlpha - lift).abs() < 0.01) {
+        return;
+      }
+      _lastLensRect = rect;
+      _lastLensAlpha = lift;
+      _lensCtl.move(rect, alpha: lift, motion: LensMotion.instant);
+    });
   }
 
   void _showLens() {
