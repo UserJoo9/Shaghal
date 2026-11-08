@@ -5,7 +5,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:liquid_design/liquid_design.dart' show LiquidGlassService;
+import 'package:liquid_design/liquid_design.dart' show LiquidGlassService, LiquidGlassStyle;
 import 'package:media_kit/media_kit.dart';
 
 import 'services/audio_handler.dart';
@@ -17,7 +17,10 @@ Future<void> main() async {
   MediaKit.ensureInitialized();
   // حركة الزجاج (ضغط/سحب/ارتداد) أقوى شوية من الافتراضي، قريبة من تطبيقات النظام.
   // الشفافية نفسها (شفاف/ملوّن) بتيجي من إعدادات النظام ومش بنتحكم فيها من التطبيق.
-  LiquidGlassService.instance.setInteractionStrength(1.3);
+  LiquidGlassService.instance
+    ..setStyle(LiquidGlassStyle.clear) // زجاج شفاف (UIGlassEffect clear)
+    ..setOpacity(1.0)
+    ..setInteractionStrength(1.3);
 
   final controller = PlayerController();
 

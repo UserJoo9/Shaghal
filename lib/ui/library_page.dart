@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:liquid_design/liquid_design.dart' show LiquidGlassService;
+import 'package:liquid_design/liquid_design.dart'
+    show LiquidGlassNavigationBar, LiquidGlassNavItem, LiquidGlassStyle;
 import 'package:path/path.dart' as p;
 
 import '../models/media_item.dart';
@@ -77,7 +78,7 @@ class LibraryPage extends ConsumerWidget {
                   left: 0,
                   right: 0,
                   bottom: MediaQuery.paddingOf(context).bottom + 10,
-                  child: const Center(child: _NavBar()),
+                  child: const _NavBar(),
                 ),
               ],
             ],
@@ -134,72 +135,24 @@ class _NavBar extends ConsumerWidget {
       (Icons.settings_rounded, s.t('الإعدادات', 'Settings'), KindFilter.settings),
     ];
     final index = tabs.indexWhere((t) => t.$3 == kind);
-    final width =
-        (MediaQuery.sizeOf(context).width - 24).clamp(0.0, 390.0).toDouble();
-    final itemW = (width - 10) / tabs.length;
 
-    return SizedBox(
-      width: width,
-      height: 68,
-      child: Glass(
-        interactive: true,
-        radius: 34,
-        padding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            AnimatedPositionedDirectional(
-              duration: const Duration(milliseconds: 420),
-              curve: Curves.easeOutBack,
-              start: 5 + (index < 0 ? 0 : index) * itemW,
-              top: 5,
-              bottom: 5,
-              width: itemW,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(29),
-                  color: context.fgA(index < 0 ? 0 : 0.16),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 5),
-              child: Row(
-                children: [
-                  for (final t in tabs)
-                    Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          if (kind != t.$3) HapticFeedback.selectionClick();
-                          ref.read(kindFilterProvider.notifier).set(t.$3);
-                        },
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              t.$1,
-                              size: 23,
-                              color: kind == t.$3 ? context.fg : context.fg54,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              t.$2,
-                              maxLines: 1,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: kind == t.$3 ? context.fg : context.fg54,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    // شريط التابات الجاهز من الحزمة: زجاج نيتيف + عدسة بتتسحب بالصباع بين التابات (زي الواتساب).
+    // نفس عرض المشغل (هامش 12 من الجنبين).
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: LiquidGlassNavigationBar(
+        height: 68,
+        currentIndex: index < 0 ? 0 : index,
+        activeColor: context.fg,
+        inactiveColor: context.fg54,
+        items: [
+          for (final t in tabs)
+            LiquidGlassNavItem(icon: Icon(t.$1), label: t.$2),
+        ],
+        onTap: (i) {
+          HapticFeedback.selectionClick();
+          ref.read(kindFilterProvider.notifier).set(tabs[i].$3);
+        },
       ),
     );
   }
@@ -1183,6 +1136,7 @@ class _SettingsBody extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final lang = ref.watch(langProvider);
     final mode = ref.watch(themeModeProvider);
+    final glass = ref.watch(glassStyleProvider);
 
     void setLang(AppLang l) {
       if (ref.read(langProvider) != l) ref.read(langProvider.notifier).toggle();
@@ -1239,23 +1193,26 @@ class _SettingsBody extends ConsumerWidget {
             ),
           ],
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            s.t(
-              'شفافية الزجاج (شفاف / ملوّن) بتتبع إعدادات الـ iPhone: الشاشة والسطوع ← Liquid Glass.',
-              'Glass transparency (Clear / Tinted) follows your iPhone settings: Display & Brightness → Liquid Glass.',
+        _SettingsGroup(
+          title: s.t('الزجاج', 'Glass'),
+          children: [
+            _ChoiceRow(
+              icon: Icons.blur_on_rounded,
+              label: s.t('شفاف', 'Clear'),
+              selected: glass == LiquidGlassStyle.clear,
+              onTap: () => ref
+                  .read(glassStyleProvider.notifier)
+                  .set(LiquidGlassStyle.clear),
             ),
-            style: TextStyle(fontSize: 12, height: 1.6, color: context.fg38),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 14, 12, 0),
-          child: Text(
-            'Glass: ${LiquidGlassService.isNativePlatform ? "native ✓" : "fallback ✗"}'
-            ' · iOS ${LiquidGlassService.osMajorVersion}',
-            style: TextStyle(fontSize: 11, color: context.fg38),
-          ),
+            _ChoiceRow(
+              icon: Icons.blur_linear_rounded,
+              label: s.t('عادي', 'Regular'),
+              selected: glass == LiquidGlassStyle.regular,
+              onTap: () => ref
+                  .read(glassStyleProvider.notifier)
+                  .set(LiquidGlassStyle.regular),
+            ),
+          ],
         ),
       ],
     );

@@ -6,6 +6,8 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:liquid_design/liquid_design.dart'
+    show LiquidGlassService, LiquidGlassStyle;
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path/path.dart' as p;
@@ -154,6 +156,40 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 
 final themeModeProvider =
     NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
+
+/// نمط الزجاج: شفاف (clear) أو عادي (regular). بيتحفظ ويتطبّق على كل الزجاج في التطبيق.
+class GlassStyleNotifier extends Notifier<LiquidGlassStyle> {
+  @override
+  LiquidGlassStyle build() {
+    _load();
+    return LiquidGlassStyle.clear;
+  }
+
+  Future<void> _load() async {
+    try {
+      final f = await _prefFile('glass.txt');
+      if (await f.exists()) {
+        final v = (await f.readAsString()).trim() == 'regular'
+            ? LiquidGlassStyle.regular
+            : LiquidGlassStyle.clear;
+        state = v;
+        LiquidGlassService.instance.setStyle(v);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> set(LiquidGlassStyle v) async {
+    state = v;
+    LiquidGlassService.instance.setStyle(v);
+    try {
+      await (await _prefFile('glass.txt')).writeAsString(v.name);
+    } catch (_) {}
+  }
+}
+
+final glassStyleProvider =
+    NotifierProvider<GlassStyleNotifier, LiquidGlassStyle>(
+        GlassStyleNotifier.new);
 
 // ───────────────────────── الفرز والفلترة ─────────────────────────
 
