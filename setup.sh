@@ -10,11 +10,7 @@ cp assets/icon/icon.png app/assets/icon/icon.png
 cp flutter_launcher_icons.yaml app/
 cd app
 
-flutter pub add flutter_riverpod media_kit media_kit_video media_kit_libs_ios_video path_provider path file_picker:^10.0.0 audio_service audio_session audio_metadata_reader video_thumbnail
-
-# نسخة معدّلة من liquid_design (حركة عدسة الـ navbar) جوّه المشروع
-cp -R ../packages .
-flutter pub add liquid_design --path packages/liquid_design
+flutter pub add flutter_riverpod media_kit media_kit_video media_kit_libs_ios_video path_provider path file_picker:^10.0.0 audio_service audio_session liquid_design:^0.4.1 audio_metadata_reader video_thumbnail
 
 flutter pub add --dev flutter_launcher_icons
 dart run flutter_launcher_icons

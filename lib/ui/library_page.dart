@@ -207,7 +207,7 @@ class _NavBarState extends ConsumerState<_NavBar> {
     final providerIndex = tabs.indexWhere((t) => t.$3 == kind);
     final index = _local ?? (providerIndex < 0 ? 0 : providerIndex);
 
-    // شريط التابات من المكتبة (نسخة معدّلة في packages/liquid_design): زجاج نيتيف + عدسة بتتسحب
+    // شريط التابات الجاهز من مكتبة liquid_design (النسخة الأصلية): زجاج نيتيف + عدسة بتتسحب
     // بالصباع. نفس عرض المشغل (هامش 12 من الجنبين).
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
