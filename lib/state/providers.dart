@@ -5,7 +5,8 @@ import 'dart:io';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:liquid_design/liquid_design.dart';
+import 'package:liquid_design/liquid_design.dart'
+    show LiquidGlassService, LiquidGlassStyle;
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path/path.dart' as p;

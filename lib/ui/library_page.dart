@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:liquid_design/liquid_design.dart';
+import 'package:liquid_design/liquid_design.dart' show LiquidGlassService;
 import 'package:path/path.dart' as p;
 
 import '../models/media_item.dart';
