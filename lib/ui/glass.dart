@@ -6,6 +6,18 @@ import 'package:liquid_design/liquid_design.dart';
 
 import '../state/providers.dart';
 
+/// ألوان بتتبدّل تلقائياً بين الداكن والفاتح.
+extension AppInk on BuildContext {
+  bool get isDark => Theme.of(this).brightness == Brightness.dark;
+  Color get bg => isDark ? Colors.black : const Color(0xFFF2F2F7);
+  Color get fg => isDark ? context.fg : const Color(0xFF111114);
+  Color fgA(double a) => fg.withValues(alpha: a);
+  Color get fg70 => fgA(0.70);
+  Color get fg54 => fgA(0.54);
+  Color get fg38 => fgA(0.38);
+  Color get fg24 => fgA(0.24);
+}
+
 /// خلفية سودا بإضاءة ملوّنة ثابتة، ولو في أغنية شغالة بيظهر غلافها مطموس خلف كل حاجة.
 /// عمداً مفيش حركة ولا blur تقيل: الخلفية بتتـrasterize مرة واحدة (RepaintBoundary)
 /// فالانتقال بين الصفحات والسكرول يفضلوا ناعمين، والزجاج لسه عنده حاجة يكسرها ويعكسها.
@@ -34,8 +46,10 @@ class GlassBackground extends ConsumerWidget {
     final path = ref.watch(currentItemProvider.select((v) => v.value?.path));
     final art = path == null ? null : ref.watch(thumbProvider(path)).value;
 
+    final k = context.isDark ? 1.0 : 0.5; // الإضاءة أخف في الوضع الفاتح
+
     return ColoredBox(
-      color: Colors.black,
+      color: context.bg,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -46,7 +60,7 @@ class GlassBackground extends ConsumerWidget {
                 // غلاف الأغنية الحالية: صورة صغيرة جداً متكبّرة = طمس رخيص من غير فلتر
                 if (art != null)
                   Opacity(
-                    opacity: 0.38,
+                    opacity: 0.38 * k,
                     child: Image.file(
                       File(art),
                       key: ValueKey(art),
@@ -57,9 +71,9 @@ class GlassBackground extends ConsumerWidget {
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
-                _glow(const Alignment(-0.9, -0.85), const Color(0xFF6A4DFF), 0.42, 520),
-                _glow(const Alignment(1.0, -0.1), const Color(0xFF0A84FF), 0.32, 480),
-                _glow(const Alignment(-0.6, 0.95), const Color(0xFFFF3B8E), 0.26, 460),
+                _glow(const Alignment(-0.9, -0.85), const Color(0xFF6A4DFF), 0.42 * k, 520),
+                _glow(const Alignment(1.0, -0.1), const Color(0xFF0A84FF), 0.32 * k, 480),
+                _glow(const Alignment(-0.6, 0.95), const Color(0xFFFF3B8E), 0.26 * k, 460),
               ],
             ),
           ),
@@ -136,7 +150,9 @@ class GlassIconButton extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onPressed,
-            child: Center(child: Icon(icon, size: iconSize, color: Colors.white)),
+            child: Center(child: Icon(icon,
+                size: iconSize,
+                color: tint != null ? Colors.white : context.fg)),
           ),
         ),
       ),
@@ -157,85 +173,6 @@ class Rtl extends ConsumerWidget {
     return Directionality(
       textDirection: ar ? TextDirection.rtl : TextDirection.ltr,
       child: child,
-    );
-  }
-}
-
-/// صف قايمة بمظهر زجاجي خفيف (تدرّج شفاف + حافة + لمعة علوية) من غير ما يعمل blur/refraction
-/// لكل صف. ده اللي بيخلّي السكرول ناعم مع مئات الصفوف، والزجاج الحقيقي مخصّص
-/// للعناصر الثابتة (الهيدر، الأزرار، شريط التشغيل، القوايم).
-class GlassTile extends StatelessWidget {
-  const GlassTile({
-    super.key,
-    required this.child,
-    this.onTap,
-    this.radius = 20,
-    this.highlight = false,
-    this.padding = const EdgeInsets.all(10),
-  });
-
-  final Widget child;
-  final VoidCallback? onTap;
-  final double radius;
-  final bool highlight;
-  final EdgeInsetsGeometry padding;
-
-  @override
-  Widget build(BuildContext context) {
-    final r = BorderRadius.circular(radius);
-    final base = highlight ? const Color(0xFF0A84FF) : Colors.white;
-    return RepaintBoundary(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: r,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              base.withValues(alpha: highlight ? 0.34 : 0.16),
-              base.withValues(alpha: highlight ? 0.12 : 0.04),
-            ],
-          ),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: highlight ? 0.40 : 0.20),
-            width: 0.8,
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: r,
-          child: Stack(
-            children: [
-              Material(
-                type: MaterialType.transparency,
-                child: InkWell(
-                  onTap: onTap,
-                  child: Padding(padding: padding, child: child),
-                ),
-              ),
-              // لمعة رفيعة على الحافة العلوية
-              Positioned(
-                top: 0,
-                left: radius,
-                right: radius,
-                height: 1,
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.white.withValues(alpha: 0),
-                          Colors.white.withValues(alpha: 0.55),
-                          Colors.white.withValues(alpha: 0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

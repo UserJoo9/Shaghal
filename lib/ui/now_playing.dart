@@ -73,12 +73,12 @@ class MiniPlayer extends ConsumerWidget {
                 playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 size: 30,
               ),
-              color: Colors.white,
+              color: context.fg,
               onPressed: ctrl.player.playOrPause,
             ),
             IconButton(
               icon: const Icon(Icons.skip_next_rounded, size: 30),
-              color: Colors.white,
+              color: context.fg,
               onPressed: ctrl.player.next,
             ),
           ],
@@ -266,8 +266,8 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                               horizontal: 18, vertical: 10),
                           child: Text(
                             '${s.t('السرعة', 'Speed')} ${_rates[_rateIndex]}x',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: context.fg,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -316,9 +316,9 @@ class _SeekBodyState extends ConsumerState<_SeekBody> {
             trackHeight: 4,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
             overlayShape: SliderComponentShape.noOverlay,
-            activeTrackColor: Colors.white,
-            inactiveTrackColor: Colors.white24,
-            thumbColor: Colors.white,
+            activeTrackColor: context.fg,
+            inactiveTrackColor: context.fg24,
+            thumbColor: context.fg,
           ),
           child: Slider(
             value: value,
@@ -337,9 +337,9 @@ class _SeekBodyState extends ConsumerState<_SeekBody> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(formatDuration(shown),
-                  style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  style: TextStyle(fontSize: 12, color: context.fg70)),
               Text(formatDuration(dur),
-                  style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  style: TextStyle(fontSize: 12, color: context.fg70)),
             ],
           ),
         ),

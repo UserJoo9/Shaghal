@@ -46,7 +46,9 @@ class LibraryPage extends ConsumerWidget {
                 children: [
                   const _Header(),
                   Expanded(
-                    child: kindTab == KindFilter.favorites
+                    child: kindTab == KindFilter.settings
+                        ? const _SettingsBody()
+                        : kindTab == KindFilter.favorites
                         ? const _FavoritesBody()
                         : sort == SortMode.folder
                         ? const _FolderBody(path: '')
@@ -101,8 +103,8 @@ class _BottomFade extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withValues(alpha: 0),
-                Colors.black.withValues(alpha: 0.88),
+                context.bg.withValues(alpha: 0),
+                context.bg.withValues(alpha: 0.88),
               ],
             ),
           ),
@@ -134,21 +136,21 @@ class _NavBar extends ConsumerWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
               color: sel
-                  ? Colors.white.withValues(alpha: 0.18)
+                  ? context.fgA(0.18)
                   : Colors.transparent,
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(icon,
-                    size: 24, color: sel ? Colors.white : Colors.white54),
+                    size: 24, color: sel ? context.fg : context.fg54),
                 const SizedBox(height: 2),
                 Text(
                   label,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: sel ? Colors.white : Colors.white54,
+                    color: sel ? context.fg : context.fg54,
                   ),
                 ),
               ],
@@ -159,7 +161,7 @@ class _NavBar extends ConsumerWidget {
     }
 
     return SizedBox(
-      width: 330,
+      width: 348,
       height: 66,
       child: Glass(
         interactive: true,
@@ -170,6 +172,7 @@ class _NavBar extends ConsumerWidget {
             item(Icons.music_note_rounded, s.t('المزيكا', 'Music'), KindFilter.audio),
             item(Icons.videocam_rounded, s.t('الفيديو', 'Videos'), KindFilter.video),
             item(Icons.favorite_rounded, s.t('المفضلة', 'Favorites'), KindFilter.favorites),
+            item(Icons.settings_rounded, s.t('الإعدادات', 'Settings'), KindFilter.settings),
           ],
         ),
       ),
@@ -189,10 +192,10 @@ enum _Act {
   refresh,
 }
 
-const _sectionLabel = TextStyle(
+TextStyle _sectionLabel(BuildContext c) => TextStyle(
   fontSize: 12,
   fontWeight: FontWeight.w700,
-  color: Colors.white54,
+  color: c.fg54,
 );
 
 class _Header extends ConsumerWidget {
@@ -203,6 +206,26 @@ class _Header extends ConsumerWidget {
     final sort = ref.watch(sortModeProvider);
     final kind = ref.watch(kindFilterProvider);
     final s = ref.watch(stringsProvider);
+    if (kind == KindFilter.settings) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 16, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                s.t('الإعدادات', 'Settings'),
+                style: const TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  height: 1.15,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     final isFav = kind == KindFilter.favorites;
     final count = isFav
         ? (ref.watch(favoriteItemsProvider).value?.length ?? 0)
@@ -222,6 +245,7 @@ class _Header extends ConsumerWidget {
       KindFilter.audio => s.t('صوت', 'Audio'),
       KindFilter.video => s.t('فيديو', 'Video'),
       KindFilter.favorites => s.t('المفضلة', 'Favorites'),
+      KindFilter.settings => s.t('الإعدادات', 'Settings'),
     };
 
     void onSelected(_Act a) {
@@ -271,17 +295,11 @@ class _Header extends ConsumerWidget {
                   isFav
                       ? '${s.t('المفضلة', 'Favorites')} · ${s.t('$count ملف', '$count files')}'
                       : '$sortLabel · $kindLabel · ${s.t('$count ملف', '$count files')}',
-                  style: const TextStyle(fontSize: 13, color: Colors.white54),
+                  style: TextStyle(fontSize: 13, color: context.fg54),
                 ),
               ],
             ),
           ),
-          GlassIconButton(
-            icon: Icons.translate_rounded,
-            size: 46,
-            onPressed: () => ref.read(langProvider.notifier).toggle(),
-          ),
-          const SizedBox(width: 10),
           GlassIconButton(
             icon: Icons.more_horiz_rounded,
             size: 46,
@@ -300,7 +318,7 @@ class _MenuLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-        child: Text(text, style: _sectionLabel),
+        child: Text(text, style: _sectionLabel(context)),
       );
 }
 
@@ -321,7 +339,7 @@ class _MenuItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
         child: Material(
           color:
-              checked ? Colors.white.withValues(alpha: 0.14) : Colors.transparent,
+              checked ? context.fgA(0.14) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -332,7 +350,7 @@ class _MenuItem extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: Row(
                   children: [
-                    Icon(icon, size: 21, color: Colors.white),
+                    Icon(icon, size: 21, color: context.fg),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -344,7 +362,7 @@ class _MenuItem extends StatelessWidget {
                       ),
                     ),
                     if (checked)
-                      const Icon(Icons.check_rounded, size: 20, color: Colors.white),
+                      Icon(Icons.check_rounded, size: 20, color: context.fg),
                   ],
                 ),
               ),
@@ -360,7 +378,7 @@ class _MenuDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
-        child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.22)),
+        child: Container(height: 0.5, color: context.fgA(0.22)),
       );
 }
 
@@ -429,16 +447,6 @@ Future<void> _showMenu(
                         _MenuItem(s.t('تحديث', 'Refresh'),
                             icon: Icons.refresh_rounded,
                             onTap: () => pick(_Act.refresh)),
-                        // تشخيص مؤقت: هل الزجاج النيتيف شغّال على الجهاز؟
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                          child: Text(
-                            'Glass: ${LiquidGlassService.isNativePlatform ? "native ✓" : "fallback ✗"}'
-                            ' · iOS ${LiquidGlassService.osMajorVersion}',
-                            style: const TextStyle(
-                                fontSize: 11, color: Colors.white38),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -460,7 +468,7 @@ void _toast(ScaffoldMessengerState m, String text) {
     content: Glass(
       radius: 22,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      child: Text(text),
+      child: Text(text, style: TextStyle(color: m.context.fg)),
     ),
   ));
 }
@@ -508,7 +516,7 @@ class _FolderEntry {
   final int count;
 }
 
-Widget _emptyMessage(S s) => Center(
+Widget _emptyMessage(BuildContext context, S s) => Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Text(
@@ -517,7 +525,7 @@ Widget _emptyMessage(S s) => Center(
             'No files here.\nTap ⋯ above → Import files or folder to add media.',
           ),
           textAlign: TextAlign.center,
-          style: const TextStyle(height: 1.7, color: Colors.white70),
+          style: TextStyle(height: 1.7, color: context.fg70),
         ),
       ),
     );
@@ -568,7 +576,7 @@ class _FolderBody extends ConsumerWidget {
           ..sort((a, b) => naturalCompare(a.name, b.name));
         tracks.sort((a, b) => naturalCompare(a.name, b.name));
 
-        if (folderList.isEmpty && tracks.isEmpty) return _emptyMessage(s);
+        if (folderList.isEmpty && tracks.isEmpty) return _emptyMessage(context, s);
 
         return _scrollWatch(ref, ListView.builder(
           padding: EdgeInsets.fromLTRB(
@@ -688,7 +696,7 @@ class _FlatRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Material(
             color: active
-                ? Colors.white.withValues(alpha: 0.10)
+                ? context.fgA(0.10)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
             clipBehavior: Clip.antiAlias,
@@ -703,7 +711,7 @@ class _FlatRow extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsetsDirectional.only(start: 88, end: 20),
-          child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.08)),
+          child: Container(height: 0.5, color: context.fgA(0.08)),
         ),
       ],
     );
@@ -753,7 +761,7 @@ class _FolderTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 13, color: Colors.white54),
+                  style: TextStyle(fontSize: 13, color: context.fg54),
                 ),
               ],
             ),
@@ -762,7 +770,7 @@ class _FolderTile extends StatelessWidget {
             Directionality.of(context) == TextDirection.rtl
                 ? Icons.chevron_left_rounded
                 : Icons.chevron_right_rounded,
-            color: Colors.white38,
+            color: context.fg38,
           ),
         ],
       ),
@@ -789,7 +797,7 @@ class _SectionList extends ConsumerWidget {
                   'then tap Refresh. Folders are kept as they are.',
             ),
             textAlign: TextAlign.center,
-            style: const TextStyle(height: 1.7, color: Colors.white70),
+            style: TextStyle(height: 1.7, color: context.fg70),
           ),
         ),
       );
@@ -820,10 +828,10 @@ class _SectionList extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
               child: Text(
                 '${row.title}  ·  ${row.count}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white70,
+                  color: context.fg70,
                 ),
               ),
             ),
@@ -899,13 +907,13 @@ class _TrackTile extends ConsumerWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
-                    color: active ? const Color(0xFF64B5FF) : Colors.white,
+                    color: active ? const Color(0xFF64B5FF) : context.fg,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   '${item.ext.toUpperCase()} · ${formatSize(item.size)}',
-                  style: const TextStyle(fontSize: 13, color: Colors.white54),
+                  style: TextStyle(fontSize: 13, color: context.fg54),
                 ),
               ],
             ),
@@ -918,7 +926,7 @@ class _TrackTile extends ConsumerWidget {
               child: Icon(
                 fav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                 size: 22,
-                color: fav ? const Color(0xFFFF2D55) : Colors.white38,
+                color: fav ? const Color(0xFFFF2D55) : context.fg38,
               ),
             ),
           ),
@@ -959,7 +967,7 @@ class _FavoritesBody extends ConsumerWidget {
                   'No favorites yet.\nTap the heart ♥ next to any track or video, or in the player, and it will show up here.',
                 ),
                 textAlign: TextAlign.center,
-                style: const TextStyle(height: 1.7, color: Colors.white70),
+                style: TextStyle(height: 1.7, color: context.fg70),
               ),
             ),
           );
@@ -1029,10 +1037,10 @@ class _FavoritesBody extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
                 child: Text(
                   '${row.title}  ·  ${row.count}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white70,
+                    color: context.fg70,
                   ),
                 ),
               );
@@ -1049,6 +1057,237 @@ class _FavoritesBody extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+
+// ───────────────────────── الإعدادات ─────────────────────────
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.title, required this.children});
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      if (i > 0) {
+        rows.add(Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Container(height: 0.5, color: context.fgA(0.10)),
+        ));
+      }
+      rows.add(children[i]);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: Text(title, style: _sectionLabel(context)),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: context.fgA(0.07),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: context.fgA(0.10), width: 0.5),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: rows),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChoiceRow extends StatelessWidget {
+  const _ChoiceRow({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 52,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(icon, size: 22, color: context.fg),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                if (selected)
+                  const Icon(Icons.check_rounded,
+                      size: 22, color: Color(0xFF0A84FF)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsBody extends ConsumerWidget {
+  const _SettingsBody();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final lang = ref.watch(langProvider);
+    final mode = ref.watch(themeModeProvider);
+    final clear = ref.watch(glassClearProvider);
+    final opacity = ref.watch(glassOpacityProvider);
+
+    void setLang(AppLang l) {
+      if (ref.read(langProvider) != l) ref.read(langProvider.notifier).toggle();
+    }
+
+    void setClear(bool c) {
+      if (ref.read(glassClearProvider) != c) {
+        ref.read(glassClearProvider.notifier).toggle();
+      }
+    }
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        200 + MediaQuery.paddingOf(context).bottom,
+      ),
+      children: [
+        _SettingsGroup(
+          title: s.t('اللغة', 'Language'),
+          children: [
+            _ChoiceRow(
+              icon: Icons.translate_rounded,
+              label: 'العربية',
+              selected: lang == AppLang.ar,
+              onTap: () => setLang(AppLang.ar),
+            ),
+            _ChoiceRow(
+              icon: Icons.language_rounded,
+              label: 'English',
+              selected: lang == AppLang.en,
+              onTap: () => setLang(AppLang.en),
+            ),
+          ],
+        ),
+        _SettingsGroup(
+          title: s.t('المظهر', 'Appearance'),
+          children: [
+            _ChoiceRow(
+              icon: Icons.dark_mode_rounded,
+              label: s.t('داكن', 'Dark'),
+              selected: mode == ThemeMode.dark,
+              onTap: () =>
+                  ref.read(themeModeProvider.notifier).set(ThemeMode.dark),
+            ),
+            _ChoiceRow(
+              icon: Icons.light_mode_rounded,
+              label: s.t('فاتح', 'Light'),
+              selected: mode == ThemeMode.light,
+              onTap: () =>
+                  ref.read(themeModeProvider.notifier).set(ThemeMode.light),
+            ),
+            _ChoiceRow(
+              icon: Icons.brightness_auto_rounded,
+              label: s.t('زي النظام', 'System'),
+              selected: mode == ThemeMode.system,
+              onTap: () =>
+                  ref.read(themeModeProvider.notifier).set(ThemeMode.system),
+            ),
+          ],
+        ),
+        _SettingsGroup(
+          title: s.t('الزجاج (Liquid Glass)', 'Liquid Glass'),
+          children: [
+            _ChoiceRow(
+              icon: Icons.blur_on_rounded,
+              label: s.t('شفاف', 'Clear'),
+              selected: clear,
+              onTap: () => setClear(true),
+            ),
+            _ChoiceRow(
+              icon: Icons.blur_circular_rounded,
+              label: s.t('عادي (ضبابي)', 'Regular (frosted)'),
+              selected: !clear,
+              onTap: () => setClear(false),
+            ),
+            SizedBox(
+              height: 56,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.opacity_rounded, size: 22, color: context.fg),
+                    Expanded(
+                      child: Slider(
+                        value: opacity,
+                        min: 0.3,
+                        max: 1.0,
+                        onChanged: (v) =>
+                            ref.read(glassOpacityProvider.notifier).preview(v),
+                        onChangeEnd: (_) =>
+                            ref.read(glassOpacityProvider.notifier).save(),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 44,
+                      child: Text(
+                        '${(opacity * 100).round()}%',
+                        textAlign: TextAlign.end,
+                        style: TextStyle(fontSize: 13, color: context.fg54),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            s.t(
+              'شفافية الزجاج النيتيف بتتأثر كمان بإعداد iPhone: الشاشة والسطوع ← Liquid Glass.',
+              'Native glass also follows your iPhone setting: Display & Brightness → Liquid Glass.',
+            ),
+            style: TextStyle(fontSize: 12, height: 1.6, color: context.fg38),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 0),
+          child: Text(
+            'Glass: ${LiquidGlassService.isNativePlatform ? "native ✓" : "fallback ✗"}'
+            ' · iOS ${LiquidGlassService.osMajorVersion}',
+            style: TextStyle(fontSize: 11, color: context.fg38),
+          ),
+        ),
+      ],
     );
   }
 }
