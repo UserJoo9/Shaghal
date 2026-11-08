@@ -81,9 +81,11 @@ class Glass extends StatelessWidget {
     this.padding = const EdgeInsets.all(12),
     this.blur = 28, // محفوظ للتوافق، النيتيف بيتحكم فيه النظام
     this.tint,
+    this.interactive = false,
   });
 
   final Widget child;
+  final bool interactive;
   final double radius;
   final EdgeInsetsGeometry padding;
   final double blur;
@@ -93,8 +95,7 @@ class Glass extends StatelessWidget {
   Widget build(BuildContext context) {
     return LiquidGlass(
       tintColor: tint,
-      interactive: false,
-      brightness: LiquidGlassBrightness.dark,
+      interactive: interactive,
       fallback: LiquidGlassFallback.frosted,
       fallbackBlurSigma: 22,
       child: ClipRRect(
@@ -144,15 +145,20 @@ class GlassIconButton extends StatelessWidget {
 }
 
 
-/// يخلّي محتوى الصفحة من اليمين لليسار من غير ما يقلب اتجاه التنقل
-/// (عشان سحب الرجوع يفضل من حافة الشمال).
-class Rtl extends StatelessWidget {
+/// بيطبّق اتجاه اللغة الحالية على الصفحة (RTL للعربي، LTR للإنجليزي) من غير ما يقلب
+/// اتجاه التنقل نفسه (عشان سحب الرجوع يفضل من حافة الشمال).
+class Rtl extends ConsumerWidget {
   const Rtl({super.key, required this.child});
   final Widget child;
 
   @override
-  Widget build(BuildContext context) =>
-      Directionality(textDirection: TextDirection.rtl, child: child);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ar = ref.watch(langProvider) == AppLang.ar;
+    return Directionality(
+      textDirection: ar ? TextDirection.rtl : TextDirection.ltr,
+      child: child,
+    );
+  }
 }
 
 /// صف قايمة بمظهر زجاجي خفيف (تدرّج شفاف + حافة + لمعة علوية) من غير ما يعمل blur/refraction

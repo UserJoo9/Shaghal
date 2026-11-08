@@ -65,6 +65,54 @@ Future<String> libraryRootPath() async {
   return docs.path;
 }
 
+
+// ───────────────────────── اللغة ─────────────────────────
+
+enum AppLang { ar, en }
+
+class LangNotifier extends Notifier<AppLang> {
+  @override
+  AppLang build() {
+    _load();
+    return AppLang.ar;
+  }
+
+  Future<File> _file() async {
+    final d = await getApplicationSupportDirectory();
+    await d.create(recursive: true);
+    return File(p.join(d.path, 'lang.txt'));
+  }
+
+  Future<void> _load() async {
+    try {
+      final f = await _file();
+      if (await f.exists() && (await f.readAsString()).trim() == 'en') {
+        state = AppLang.en;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> toggle() async {
+    state = state == AppLang.ar ? AppLang.en : AppLang.ar;
+    try {
+      await (await _file()).writeAsString(state == AppLang.en ? 'en' : 'ar');
+    } catch (_) {}
+  }
+}
+
+final langProvider =
+    NotifierProvider<LangNotifier, AppLang>(LangNotifier.new);
+
+/// ترجمة بسيطة: s.t('عربي', 'English').
+class S {
+  const S(this.lang);
+  final AppLang lang;
+  bool get ar => lang == AppLang.ar;
+  String t(String arabic, String english) => ar ? arabic : english;
+}
+
+final stringsProvider = Provider<S>((ref) => S(ref.watch(langProvider)));
+
 // ───────────────────────── الفرز والفلترة ─────────────────────────
 
 enum SortMode { folder, date, name }
@@ -93,6 +141,11 @@ const _months = [
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
 ];
 
+const _monthsEn = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
 /// مقارنة طبيعية: "track 2" قبل "track 10".
 int naturalCompare(String a, String b) {
   final re = RegExp(r'(\d+|\D+)');
@@ -113,6 +166,7 @@ final sectionsProvider = Provider<AsyncValue<List<MediaSection>>>((ref) {
   final lib = ref.watch(libraryProvider);
   final sort = ref.watch(sortModeProvider);
   final kind = ref.watch(kindFilterProvider);
+  final s = ref.watch(stringsProvider);
 
   return lib.whenData((all) {
     final items = all.where((i) {
@@ -140,7 +194,7 @@ final sectionsProvider = Provider<AsyncValue<List<MediaSection>>>((ref) {
         return [
           for (final e in byFolder.entries)
             MediaSection(
-              e.key.isEmpty ? 'المجلد الرئيسي' : e.key,
+              e.key.isEmpty ? s.t('المجلد الرئيسي', 'Main folder') : e.key,
               e.value..sort((a, b) => naturalCompare(a.name, b.name)),
             ),
         ];
@@ -148,13 +202,14 @@ final sectionsProvider = Provider<AsyncValue<List<MediaSection>>>((ref) {
         items.sort((a, b) => b.modified.compareTo(a.modified));
         final groups = LinkedHashMap<String, List<MediaItem>>();
         for (final i in items) {
-          final key = '${_months[i.modified.month - 1]} ${i.modified.year}';
+          final m = (s.ar ? _months : _monthsEn)[i.modified.month - 1];
+          final key = '$m ${i.modified.year}';
           groups.putIfAbsent(key, () => []).add(i);
         }
         return [for (final e in groups.entries) MediaSection(e.key, e.value)];
       case SortMode.name:
         items.sort((a, b) => naturalCompare(a.name, b.name));
-        return [if (items.isNotEmpty) MediaSection('كل الملفات', items)];
+        return [if (items.isNotEmpty) MediaSection(s.t('كل الملفات', 'All files'), items)];
     }
   });
 });

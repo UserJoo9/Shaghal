@@ -48,6 +48,7 @@ class MiniPlayer extends ConsumerWidget {
       behavior: HitTestBehavior.opaque,
       onTap: () => openFullPlayer(context),
       child: Glass(
+        interactive: true,
         radius: 34,
         padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
         child: Row(
@@ -103,6 +104,7 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
     final ctrl = ref.watch(playerProvider);
     final item = ref.watch(currentItemProvider).value;
     final playing = ref.watch(playingProvider).value ?? false;
+    final s = ref.watch(stringsProvider);
     final isFav = item != null &&
         ref.watch(favoritesProvider.select((f) => f.contains(favKey(item))));
 
@@ -113,20 +115,17 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                // الرجوع دايماً على الشمال (زي iOS وسحب الحافة)، والعنوان بيتبع اتجاه اللغة
                 Row(
+                  textDirection: TextDirection.ltr,
                   children: [
-                    Expanded(
-                      child: Text(
-                        item?.name ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                    GlassIconButton(
+                      icon: Icons.chevron_left_rounded,
+                      size: 46,
+                      iconSize: 30,
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     if (item != null) ...[
                       GlassIconButton(
                         icon: isFav
@@ -137,13 +136,18 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                         onPressed: () =>
                             ref.read(favoritesProvider.notifier).toggle(item),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                     ],
-                    GlassIconButton(
-                      icon: Icons.chevron_left_rounded,
-                      size: 46,
-                      iconSize: 30,
-                      onPressed: () => Navigator.of(context).pop(),
+                    Expanded(
+                      child: Text(
+                        item?.name ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -256,11 +260,12 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                           ctrl.player.setRate(_rates[_rateIndex]);
                         },
                         child: Glass(
+                          interactive: true,
                           radius: 20,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 18, vertical: 10),
                           child: Text(
-                            'السرعة ${_rates[_rateIndex]}x',
+                            '${s.t('السرعة', 'Speed')} ${_rates[_rateIndex]}x',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,

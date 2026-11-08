@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:liquid_design/liquid_design.dart';
 import 'package:path/path.dart' as p;
 
 import '../models/media_item.dart';
@@ -31,6 +32,7 @@ class LibraryPage extends ConsumerWidget {
     final sections = ref.watch(sectionsProvider);
     final sort = ref.watch(sortModeProvider);
     final kindTab = ref.watch(kindFilterProvider);
+    final s = ref.watch(stringsProvider);
     final hasCurrent =
         ref.watch(currentItemProvider.select((v) => v.value != null));
 
@@ -52,7 +54,7 @@ class LibraryPage extends ConsumerWidget {
                             loading: () => const Center(
                                 child: CircularProgressIndicator()),
                             error: (e, _) =>
-                                Center(child: Text('حصل خطأ: $e')),
+                                Center(child: Text('${s.t('حصل خطأ', 'Error')}: $e')),
                             data: (data) => _SectionList(sections: data),
                           ),
                   ),
@@ -117,6 +119,7 @@ class _NavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final kind = ref.watch(kindFilterProvider);
+    final s = ref.watch(stringsProvider);
 
     Widget item(IconData icon, String label, KindFilter k) {
       final sel = kind == k;
@@ -159,13 +162,14 @@ class _NavBar extends ConsumerWidget {
       width: 330,
       height: 66,
       child: Glass(
+        interactive: true,
         radius: 33,
         padding: EdgeInsets.zero,
         child: Row(
           children: [
-            item(Icons.music_note_rounded, 'المزيكا', KindFilter.audio),
-            item(Icons.videocam_rounded, 'الفيديو', KindFilter.video),
-            item(Icons.favorite_rounded, 'المفضلة', KindFilter.favorites),
+            item(Icons.music_note_rounded, s.t('المزيكا', 'Music'), KindFilter.audio),
+            item(Icons.videocam_rounded, s.t('الفيديو', 'Videos'), KindFilter.video),
+            item(Icons.favorite_rounded, s.t('المفضلة', 'Favorites'), KindFilter.favorites),
           ],
         ),
       ),
@@ -198,6 +202,7 @@ class _Header extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sort = ref.watch(sortModeProvider);
     final kind = ref.watch(kindFilterProvider);
+    final s = ref.watch(stringsProvider);
     final isFav = kind == KindFilter.favorites;
     final count = isFav
         ? (ref.watch(favoriteItemsProvider).value?.length ?? 0)
@@ -208,15 +213,15 @@ class _Header extends ConsumerWidget {
             0);
 
     final sortLabel = switch (sort) {
-      SortMode.folder => 'فولدرات',
-      SortMode.date => 'التاريخ',
-      SortMode.name => 'الاسم',
+      SortMode.folder => s.t('فولدرات', 'Folders'),
+      SortMode.date => s.t('التاريخ', 'Date'),
+      SortMode.name => s.t('الاسم', 'Name'),
     };
     final kindLabel = switch (kind) {
-      KindFilter.all => 'الكل',
-      KindFilter.audio => 'صوت',
-      KindFilter.video => 'فيديو',
-      KindFilter.favorites => 'المفضلة',
+      KindFilter.all => s.t('الكل', 'All'),
+      KindFilter.audio => s.t('صوت', 'Audio'),
+      KindFilter.video => s.t('فيديو', 'Video'),
+      KindFilter.favorites => s.t('المفضلة', 'Favorites'),
     };
 
     void onSelected(_Act a) {
@@ -235,9 +240,9 @@ class _Header extends ConsumerWidget {
         case _Act.kindVideo:
           ref.read(kindFilterProvider.notifier).set(KindFilter.video);
         case _Act.importFiles:
-          _import(context, lib.importFiles);
+          _import(context, s, lib.importFiles);
         case _Act.importFolder:
-          _import(context, lib.importFolder);
+          _import(context, s, lib.importFolder);
         case _Act.refresh:
           lib.refresh();
       }
@@ -253,7 +258,7 @@ class _Header extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isFav ? 'المفضلة' : 'المكتبة',
+                  isFav ? s.t('المفضلة', 'Favorites') : s.t('المكتبة', 'Library'),
                   style: TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.w800,
@@ -264,17 +269,23 @@ class _Header extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   isFav
-                      ? 'المفضلة · $count ملف'
-                      : '$sortLabel · $kindLabel · $count ملف',
+                      ? '${s.t('المفضلة', 'Favorites')} · ${s.t('$count ملف', '$count files')}'
+                      : '$sortLabel · $kindLabel · ${s.t('$count ملف', '$count files')}',
                   style: const TextStyle(fontSize: 13, color: Colors.white54),
                 ),
               ],
             ),
           ),
           GlassIconButton(
+            icon: Icons.translate_rounded,
+            size: 46,
+            onPressed: () => ref.read(langProvider.notifier).toggle(),
+          ),
+          const SizedBox(width: 10),
+          GlassIconButton(
             icon: Icons.more_horiz_rounded,
             size: 46,
-            onPressed: () => _showMenu(context, sort, kind, onSelected),
+            onPressed: () => _showMenu(context, s, sort, kind, onSelected),
           ),
         ],
       ),
@@ -356,6 +367,7 @@ class _MenuDivider extends StatelessWidget {
 /// قايمة Liquid Glass: لوح زجاج واحد، عناصر بأيقونات، والمختار بيتظلّل بكبسولة.
 Future<void> _showMenu(
   BuildContext context,
+  S s,
   SortMode sort,
   KindFilter kind,
   void Function(_Act) onSelected,
@@ -380,7 +392,7 @@ Future<void> _showMenu(
       return Rtl(
         child: SafeArea(
           child: Align(
-            alignment: Alignment.topLeft,
+            alignment: AlignmentDirectional.topEnd,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 66, 16, 0),
               child: SizedBox(
@@ -394,29 +406,39 @@ Future<void> _showMenu(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _MenuLabel('الفرز'),
-                        _MenuItem('بالفولدرات',
+                        _MenuLabel(s.t('الفرز', 'Sort')),
+                        _MenuItem(s.t('بالفولدرات', 'By folder'),
                             icon: Icons.folder_rounded,
                             checked: sort == SortMode.folder,
                             onTap: () => pick(_Act.sortFolder)),
-                        _MenuItem('بالتاريخ',
+                        _MenuItem(s.t('بالتاريخ', 'By date'),
                             icon: Icons.calendar_today_rounded,
                             checked: sort == SortMode.date,
                             onTap: () => pick(_Act.sortDate)),
-                        _MenuItem('بالاسم',
+                        _MenuItem(s.t('بالاسم', 'By name'),
                             icon: Icons.sort_by_alpha_rounded,
                             checked: sort == SortMode.name,
                             onTap: () => pick(_Act.sortName)),
                         const _MenuDivider(),
-                        _MenuItem('استيراد ملفات',
+                        _MenuItem(s.t('استيراد ملفات', 'Import files'),
                             icon: Icons.audio_file_rounded,
                             onTap: () => pick(_Act.importFiles)),
-                        _MenuItem('استيراد فولدر',
+                        _MenuItem(s.t('استيراد فولدر', 'Import folder'),
                             icon: Icons.create_new_folder_rounded,
                             onTap: () => pick(_Act.importFolder)),
-                        _MenuItem('تحديث',
+                        _MenuItem(s.t('تحديث', 'Refresh'),
                             icon: Icons.refresh_rounded,
                             onTap: () => pick(_Act.refresh)),
+                        // تشخيص مؤقت: هل الزجاج النيتيف شغّال على الجهاز؟
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                          child: Text(
+                            'Glass: ${LiquidGlassService.isNativePlatform ? "native ✓" : "fallback ✗"}'
+                            ' · iOS ${LiquidGlassService.osMajorVersion}',
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.white38),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -460,6 +482,7 @@ Widget _scrollWatch(WidgetRef ref, Widget child) {
 
 Future<void> _import(
   BuildContext context,
+  S s,
   Future<ImportResult> Function() action,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
@@ -468,11 +491,13 @@ Future<void> _import(
     if (r.copied == 0 && r.skipped == 0) return; // اتلغى
     _toast(
       messenger,
-      'تم استيراد ${r.copied} ملف'
-      '${r.skipped > 0 ? ' · اتخطّى ${r.skipped}' : ''}',
+      s.t('تم استيراد ${r.copied} ملف', 'Imported ${r.copied} files') +
+          (r.skipped > 0
+              ? s.t(' · اتخطّى ${r.skipped}', ' · skipped ${r.skipped}')
+              : ''),
     );
   } catch (e) {
-    _toast(messenger, 'فشل الاستيراد: $e');
+    _toast(messenger, '${s.t('فشل الاستيراد', 'Import failed')}: $e');
   }
 }
 
@@ -483,16 +508,19 @@ class _FolderEntry {
   final int count;
 }
 
-const _emptyMessage = Center(
-  child: Padding(
-    padding: EdgeInsets.all(32),
-    child: Text(
-      'مفيش ملفات هنا.\nدوس على ⋯ فوق ← استيراد ملفات أو فولدر عشان تضيف ميديا.',
-      textAlign: TextAlign.center,
-      style: TextStyle(height: 1.7, color: Colors.white70),
-    ),
-  ),
-);
+Widget _emptyMessage(S s) => Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Text(
+          s.t(
+            'مفيش ملفات هنا.\nدوس على ⋯ فوق ← استيراد ملفات أو فولدر عشان تضيف ميديا.',
+            'No files here.\nTap ⋯ above → Import files or folder to add media.',
+          ),
+          textAlign: TextAlign.center,
+          style: const TextStyle(height: 1.7, color: Colors.white70),
+        ),
+      ),
+    );
 
 /// محتوى فولدر: الفولدرات الفرعية الأول، وبعدها الأغاني اللي جواه مباشرة.
 class _FolderBody extends ConsumerWidget {
@@ -503,10 +531,11 @@ class _FolderBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final lib = ref.watch(libraryProvider);
     final kind = ref.watch(kindFilterProvider);
+    final s = ref.watch(stringsProvider);
 
     return lib.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('حصل خطأ: $e')),
+      error: (e, _) => Center(child: Text('${s.t('حصل خطأ', 'Error')}: $e')),
       data: (all) {
         final target = path.isEmpty ? const <String>[] : p.split(path);
         final folders = <String, _FolderEntry>{};
@@ -539,7 +568,7 @@ class _FolderBody extends ConsumerWidget {
           ..sort((a, b) => naturalCompare(a.name, b.name));
         tracks.sort((a, b) => naturalCompare(a.name, b.name));
 
-        if (folderList.isEmpty && tracks.isEmpty) return _emptyMessage;
+        if (folderList.isEmpty && tracks.isEmpty) return _emptyMessage(s);
 
         return _scrollWatch(ref, ListView.builder(
           padding: EdgeInsets.fromLTRB(
@@ -554,6 +583,7 @@ class _FolderBody extends ConsumerWidget {
               final f = folderList[index];
               return _FolderTile(
                 entry: f,
+                subtitle: s.t('${f.count} ملف', '${f.count} files'),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => FolderPage(path: f.path, title: f.name),
@@ -597,9 +627,17 @@ class FolderPage extends ConsumerWidget {
               Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 10, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 20, 8),
                     child: Row(
+                      textDirection: TextDirection.ltr,
                       children: [
+                        GlassIconButton(
+                          icon: Icons.chevron_left_rounded,
+                          size: 46,
+                          iconSize: 30,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             title,
@@ -611,13 +649,6 @@ class FolderPage extends ConsumerWidget {
                               letterSpacing: -0.4,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        GlassIconButton(
-                          icon: Icons.chevron_left_rounded,
-                          size: 46,
-                          iconSize: 30,
-                          onPressed: () => Navigator.of(context).pop(),
                         ),
                       ],
                     ),
@@ -680,8 +711,13 @@ class _FlatRow extends StatelessWidget {
 }
 
 class _FolderTile extends StatelessWidget {
-  const _FolderTile({required this.entry, required this.onTap});
+  const _FolderTile({
+    required this.entry,
+    required this.subtitle,
+    required this.onTap,
+  });
   final _FolderEntry entry;
+  final String subtitle;
   final VoidCallback onTap;
 
   @override
@@ -716,13 +752,18 @@ class _FolderTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${entry.count} ملف',
+                  subtitle,
                   style: const TextStyle(fontSize: 13, color: Colors.white54),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_left_rounded, color: Colors.white38),
+          Icon(
+            Directionality.of(context) == TextDirection.rtl
+                ? Icons.chevron_left_rounded
+                : Icons.chevron_right_rounded,
+            color: Colors.white38,
+          ),
         ],
       ),
     );
@@ -735,15 +776,20 @@ class _SectionList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     if (sections.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
+          padding: const EdgeInsets.all(32),
           child: Text(
-            'مفيش ملفات لسه.\nانقل ملفاتك من تطبيق «الملفات» ← على iPhone ← Shaghal '
-            'وبعدها اضغط تحديث. الفولدرات هتتحفظ زي ما هي.',
+            s.t(
+              'مفيش ملفات لسه.\nانقل ملفاتك من تطبيق «الملفات» ← على iPhone ← Shaghal '
+                  'وبعدها اضغط تحديث. الفولدرات هتتحفظ زي ما هي.',
+              'No files yet.\nMove your files from the Files app → On My iPhone → Shaghal, '
+                  'then tap Refresh. Folders are kept as they are.',
+            ),
             textAlign: TextAlign.center,
-            style: TextStyle(height: 1.7, color: Colors.white70),
+            style: const TextStyle(height: 1.7, color: Colors.white70),
           ),
         ),
       );
@@ -897,19 +943,23 @@ class _FavoritesBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fav = ref.watch(favoriteItemsProvider);
+    final s = ref.watch(stringsProvider);
 
     return fav.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('حصل خطأ: $e')),
+      error: (e, _) => Center(child: Text('${s.t('حصل خطأ', 'Error')}: $e')),
       data: (items) {
         if (items.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(32),
+              padding: const EdgeInsets.all(32),
               child: Text(
-                'لسه مفيش مفضّلات.\nدوس على القلب ♥ جنب أي أغنية أو فيديو، أو من شاشة التشغيل، وهتلاقيه هنا.',
+                s.t(
+                  'لسه مفيش مفضّلات.\nدوس على القلب ♥ جنب أي أغنية أو فيديو، أو من شاشة التشغيل، وهتلاقيه هنا.',
+                  'No favorites yet.\nTap the heart ♥ next to any track or video, or in the player, and it will show up here.',
+                ),
                 textAlign: TextAlign.center,
-                style: TextStyle(height: 1.7, color: Colors.white70),
+                style: const TextStyle(height: 1.7, color: Colors.white70),
               ),
             ),
           );
@@ -932,7 +982,8 @@ class _FavoritesBody extends ConsumerWidget {
           for (final k in keys) {
             final g = groups[k]!
               ..sort((a, b) => naturalCompare(a.name, b.name));
-            rows.add(_HeaderRow(k.isEmpty ? 'المجلد الرئيسي' : k, g.length));
+            rows.add(_HeaderRow(
+                k.isEmpty ? s.t('المجلد الرئيسي', 'Main folder') : k, g.length));
             for (final i in g) {
               rows.add(_TrackRow(i, queue.length));
               queue.add(i);
@@ -940,9 +991,9 @@ class _FavoritesBody extends ConsumerWidget {
           }
         }
 
-        addKind('المزيكا', Icons.music_note_rounded,
+        addKind(s.t('المزيكا', 'Music'), Icons.music_note_rounded,
             items.where((i) => !i.isVideo).toList());
-        addKind('الفيديو', Icons.videocam_rounded,
+        addKind(s.t('الفيديو', 'Videos'), Icons.videocam_rounded,
             items.where((i) => i.isVideo).toList());
 
         return ListView.builder(

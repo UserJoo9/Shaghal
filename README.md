@@ -29,7 +29,8 @@ A black, Liquid Glass audio and video player for iPhone, built with Flutter. It 
 - **Control Center and lock screen controls.** Play, pause, next, previous and seeking, with title, artist (taken from the folder name) and artwork. Headphone buttons work, and playback pauses on calls or when headphones are unplugged.
 - **Background playback.**
 - **Swipe from the left edge to go back.**
-- **Arabic UI** (right-to-left), with English app name.
+- **Arabic and English UI** with a one-tap language switch (right-to-left / left-to-right).
+- **Tabs and favorites.** A glass tab bar splits **Music**, **Videos** and **Favorites**; tap the heart on any track or in the player to favorite it.
 - **In-app import** of files and folders, plus Files-app access to the app's folder.
 
 ## Supported formats
