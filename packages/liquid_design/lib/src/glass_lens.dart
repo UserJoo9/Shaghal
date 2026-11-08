@@ -15,6 +15,7 @@ class GlassLensController {
   void move(
     Rect rect, {
     double alpha = 1,
+    double scale = 1,
     LensMotion motion = LensMotion.spring,
     double duration = 0.45,
     double damping = 0.72,
@@ -25,6 +26,7 @@ class GlassLensController {
       'w': rect.width,
       'h': rect.height,
       'alpha': alpha,
+      'scale': scale,
       'motion': motion.name,
       'duration': duration,
       'damping': damping,

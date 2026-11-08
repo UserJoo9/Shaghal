@@ -732,13 +732,21 @@ final class LiquidGlassLensView: UIView, LiquidGlassUpdatable {
       let x = number(args["x"]), let y = number(args["y"]),
       let w = number(args["w"]), let h = number(args["h"])
     else { return }
-    let target = CGRect(x: x, y: y, width: w, height: h)
     let alpha = number(args["alpha"]) ?? 1
+    let scale = CGFloat(number(args["scale"]) ?? 1)
+    let size = CGSize(width: w, height: h)
+    let center = CGPoint(x: x + w / 2, y: y + h / 2)
     let radius = min(w, h) / 2
+    // الحجم الأساسي ثابت: بنغيّره (وبيعيد رسم الزجاج) بس لما يتغيّر فعلاً.
+    // الحركة والتصغير بيتعملوا بـ center + transform، وهما رخاص جداً على الزجاج النيتيف.
     let apply = {
-      self.lens.frame = target
-      self.lens.layer.cornerRadius = radius
-      self.glass.layer.cornerRadius = radius
+      if self.lens.bounds.size != size {
+        self.lens.bounds = CGRect(origin: .zero, size: size)
+        self.lens.layer.cornerRadius = radius
+        self.glass.layer.cornerRadius = radius
+      }
+      self.lens.center = center
+      self.lens.transform = CGAffineTransform(scaleX: scale, y: scale)
       self.lens.alpha = alpha
     }
     lens.layer.cornerCurve = .continuous

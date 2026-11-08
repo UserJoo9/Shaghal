@@ -230,18 +230,18 @@ class _GlassSelectionBarState extends State<GlassSelectionBar>
       if (!mounted || !_nativeLens || !_lensReady || widget.collapsed) return;
       final lift = _lift.value.clamp(0.0, 1.0);
       final scale = 0.8 + 0.2 * lift;
-      // من غير تمطيط للعدسة: ثبات الحجم أرخص بكتير على الزجاج النيتيف.
-      final rect = _lensRect(_pos.value, scale, 0);
+      // الحجم ثابت والتصغير بـ transform نيتيف (scale)، فمفيش إعادة رسم للزجاج مع كل frame.
+      final rect = _lensRect(_pos.value, 1, 0);
       final last = _lastLensRect;
       if (last != null &&
           (last.left - rect.left).abs() < 0.1 &&
           (last.width - rect.width).abs() < 0.1 &&
-          (_lastLensAlpha - lift).abs() < 0.01) {
+          (_lastLensAlpha - lift).abs() < 0.005) {
         return;
       }
       _lastLensRect = rect;
       _lastLensAlpha = lift;
-      _lensCtl.move(rect, alpha: lift, motion: LensMotion.instant);
+      _lensCtl.move(rect, alpha: lift, scale: scale, motion: LensMotion.instant);
     });
   }
 
