@@ -10,7 +10,7 @@ import '../state/providers.dart';
 extension AppInk on BuildContext {
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
   Color get bg => isDark ? Colors.black : const Color(0xFFF2F2F7);
-  Color get fg => isDark ? context.fg : const Color(0xFF111114);
+  Color get fg => isDark ? Colors.white : const Color(0xFF111114);
   Color fgA(double a) => fg.withValues(alpha: a);
   Color get fg70 => fgA(0.70);
   Color get fg54 => fgA(0.54);
