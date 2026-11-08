@@ -47,6 +47,14 @@ class LibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     await refresh();
     return r;
   }
+
+  /// يضيف ملفات جوّه فولدر معيّن (مسار نسبي من جذر المكتبة).
+  Future<ImportResult> importFilesInto(String relFolder) async {
+    final root = await libraryRootPath();
+    final r = await importer.importFiles(p.join(root, relFolder));
+    await refresh();
+    return r;
+  }
 }
 
 /// جذر المكتبة. iOS: Documents بتاع التطبيق (بيظهر في تطبيق «الملفات»).
@@ -367,6 +375,22 @@ class PlayerController {
     );
   }
 
+  /// العنصر الحالي من الـ playlist. بنطابق بالمسار (مش بالرقم) عشان الـ shuffle
+  /// بيغيّر ترتيب الـ playlist عن ترتيب القايمة الأصلية.
+  MediaItem? itemFor(Playlist pl) {
+    final i = pl.index;
+    if (i < 0 || i >= pl.medias.length) return null;
+    final uri = pl.medias[i].uri;
+    for (final t in queue) {
+      if (t.path == uri) return t;
+    }
+    final decoded = Uri.decodeFull(uri);
+    for (final t in queue) {
+      if (t.path == decoded || Uri.file(t.path).toString() == uri) return t;
+    }
+    return i < queue.length ? queue[i] : null;
+  }
+
   Future<void> _activateSession() async {
     if (!(Platform.isIOS || Platform.isAndroid || Platform.isMacOS)) return;
     try {
@@ -387,9 +411,14 @@ final playerProvider = Provider<PlayerController>((ref) {
 // (وإلا الوقت والمدة بيفضلوا 00:00 لو الصفحة اتفتحت بعد ما القيمة اتبعتت).
 final currentItemProvider = StreamProvider<MediaItem?>((ref) async* {
   final c = ref.watch(playerProvider);
-  MediaItem? at(int i) => (i >= 0 && i < c.queue.length) ? c.queue[i] : null;
-  yield at(c.player.state.playlist.index);
-  yield* c.player.stream.playlist.map((pl) => at(pl.index));
+  yield c.itemFor(c.player.state.playlist);
+  yield* c.player.stream.playlist.map(c.itemFor);
+});
+
+final shuffleProvider = StreamProvider<bool>((ref) async* {
+  final pl = ref.watch(playerProvider).player;
+  yield pl.state.shuffle;
+  yield* pl.stream.shuffle;
 });
 
 final playingProvider = StreamProvider<bool>((ref) async* {

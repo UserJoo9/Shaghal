@@ -39,9 +39,8 @@ class ShaghalAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   void _updateItem() {
-    final i = _c.player.state.playlist.index;
-    if (i < 0 || i >= _c.queue.length) return;
-    final t = _c.queue[i];
+    final t = _c.itemFor(_c.player.state.playlist);
+    if (t == null) return;
     final d = _c.player.state.duration;
     final item = svc.MediaItem(
       id: t.path,

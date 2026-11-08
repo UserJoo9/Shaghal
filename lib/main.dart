@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,7 +64,34 @@ ThemeData _theme(Brightness b) {
     scaffoldBackgroundColor: bg,
     splashFactory: NoSplash.splashFactory,
     highlightColor: dark ? Colors.white10 : Colors.black12,
+    pageTransitionsTheme: const PageTransitionsTheme(builders: {
+      TargetPlatform.iOS: _NoParallaxTransitions(),
+      TargetPlatform.android: _NoParallaxTransitions(),
+    }),
   );
+}
+
+/// نفس انتقال iOS (انزلاق + سحب من الحافة للرجوع) لكن من غير ما الصفحة اللي تحت تتحرك.
+/// الصفحة اللي تحت فيها زجاج نيتيف (navbar والمشغّل)، وتحريكه مع كل frame هو سبب الرعشة.
+class _NoParallaxTransitions extends PageTransitionsBuilder {
+  const _NoParallaxTransitions();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return const CupertinoPageTransitionsBuilder().buildTransitions<T>(
+      route,
+      context,
+      animation,
+      const AlwaysStoppedAnimation<double>(0),
+      child,
+    );
+  }
 }
 
 class ShaghalApp extends ConsumerWidget {

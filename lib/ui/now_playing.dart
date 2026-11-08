@@ -104,6 +104,7 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
     final ctrl = ref.watch(playerProvider);
     final item = ref.watch(currentItemProvider).value;
     final playing = ref.watch(playingProvider).value ?? false;
+    final shuffle = ref.watch(shuffleProvider).value ?? false;
     final s = ref.watch(stringsProvider);
     final isFav = item != null &&
         ref.watch(favoritesProvider.select((f) => f.contains(favKey(item))));
@@ -253,25 +254,38 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: () {
-                          setState(() =>
-                              _rateIndex = (_rateIndex + 1) % _rates.length);
-                          ctrl.player.setRate(_rates[_rateIndex]);
-                        },
-                        child: Glass(
-                          interactive: true,
-                          radius: 20,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 10),
-                          child: Text(
-                            '${s.t('السرعة', 'Speed')} ${_rates[_rateIndex]}x',
-                            style: TextStyle(
-                              color: context.fg,
-                              fontWeight: FontWeight.w600,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GlassIconButton(
+                            icon: Icons.shuffle_rounded,
+                            size: 46,
+                            iconSize: 22,
+                            tint: shuffle ? const Color(0xFF0A84FF) : null,
+                            onPressed: () => ctrl.player.setShuffle(!shuffle),
+                          ),
+                          const SizedBox(width: 14),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() =>
+                                  _rateIndex = (_rateIndex + 1) % _rates.length);
+                              ctrl.player.setRate(_rates[_rateIndex]);
+                            },
+                            child: Glass(
+                              interactive: true,
+                              radius: 20,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 10),
+                              child: Text(
+                                '${s.t('السرعة', 'Speed')} ${_rates[_rateIndex]}x',
+                                style: TextStyle(
+                                  color: context.fg,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
