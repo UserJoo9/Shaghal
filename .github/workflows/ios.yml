@@ -27,7 +27,18 @@ jobs:
 
       - name: Build (no codesign)
         working-directory: app
-        run: flutter build ios --release --no-codesign
+        run: |
+          set -o pipefail
+          flutter build ios --release --no-codesign -v 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+      # لو البناء فشل: اطبع الأخطاء الحقيقية (Dart / Swift / ObjC / Pods)
+      - name: Show build errors
+        if: failure()
+        run: |
+          echo "===== error lines ====="
+          grep -nE "error:|Error:|\\*\\* BUILD FAILED|requires a development team|Undefined symbols|ld: " build.log | head -80 || true
+          echo "===== last 120 lines ====="
+          tail -n 120 build.log
 
       # تشخيص: هل الزجاج النيتيف (UIGlassEffect) اتبنى فعلاً جوّه التطبيق؟
       - name: Diagnose Liquid Glass support
