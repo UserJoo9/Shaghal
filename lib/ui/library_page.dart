@@ -49,19 +49,29 @@ class LibraryPage extends ConsumerWidget {
                 children: [
                   const _Header(),
                   Expanded(
-                    child: kindTab == KindFilter.settings
-                        ? const _SettingsBody()
-                        : kindTab == KindFilter.favorites
-                        ? const _FavoritesBody()
-                        : sort == SortMode.folder
-                        ? const _FolderBody(path: '')
-                        : sections.when(
-                            loading: () => const Center(
-                                child: CircularProgressIndicator()),
-                            error: (e, _) =>
-                                Center(child: Text('${s.t('حصل خطأ', 'Error')}: $e')),
-                            data: (data) => _SectionList(sections: data),
-                          ),
+                    child: _TabSwitcher(
+                      index: switch (kindTab) {
+                        KindFilter.video => 1,
+                        KindFilter.favorites => 2,
+                        KindFilter.settings => 3,
+                        _ => 0,
+                      },
+                      child: kindTab == KindFilter.settings
+                          ? const _SettingsBody()
+                          : kindTab == KindFilter.favorites
+                              ? const _FavoritesBody()
+                              : sort == SortMode.folder
+                                  ? const _FolderBody(path: '')
+                                  : sections.when(
+                                      loading: () => const Center(
+                                          child: CircularProgressIndicator()),
+                                      error: (e, _) => Center(
+                                          child: Text(
+                                              '${s.t('حصل خطأ', 'Error')}: $e')),
+                                      data: (data) =>
+                                          _SectionList(sections: data),
+                                    ),
+                    ),
                   ),
                 ],
               ),
@@ -86,6 +96,56 @@ class LibraryPage extends ConsumerWidget {
         ),
       ),
     ));
+  }
+}
+
+/// بيقلّب بين صفحات التابات بانزلاق + fade، واتجاه الانزلاق حسب ترتيب التاب (واتجاه اللغة).
+class _TabSwitcher extends StatefulWidget {
+  const _TabSwitcher({required this.index, required this.child});
+  final int index;
+  final Widget child;
+
+  @override
+  State<_TabSwitcher> createState() => _TabSwitcherState();
+}
+
+class _TabSwitcherState extends State<_TabSwitcher> {
+  int _prev = 0;
+
+  @override
+  void didUpdateWidget(_TabSwitcher old) {
+    super.didUpdateWidget(old);
+    if (old.index != widget.index) _prev = old.index;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    // +1 = الجديد داخل من نهاية الشاشة (التاب الأعلى ترتيباً)
+    final forward = widget.index >= _prev;
+    final dir = (forward ? 1.0 : -1.0) * (rtl ? -1.0 : 1.0);
+    final current = ValueKey<int>(widget.index);
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 360),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, anim) {
+        final incoming = child.key == current;
+        final slide = Tween<Offset>(
+          begin: Offset(incoming ? dir * 0.35 : -dir * 0.35, 0),
+          end: Offset.zero,
+        ).animate(anim);
+        return FadeTransition(
+          opacity: anim,
+          child: SlideTransition(position: slide, child: child),
+        );
+      },
+      child: KeyedSubtree(
+        key: current,
+        child: RepaintBoundary(child: widget.child),
+      ),
+    );
   }
 }
 
@@ -129,7 +189,7 @@ class _NavBar extends ConsumerStatefulWidget {
 
 class _NavBarState extends ConsumerState<_NavBar> {
   // التاب المختار محلياً: بيتحدّث فوراً عشان العدسة تستقر مكانها من غير ما تستنى
-  // إعادة بناء الصفحة التقيلة (وده اللي كان بيخليها ترجع ثم تروح تاني).
+  // إعادة بناء الصفحة التقيلة.
   int? _local;
   int _token = 0;
 
@@ -147,8 +207,8 @@ class _NavBarState extends ConsumerState<_NavBar> {
     final providerIndex = tabs.indexWhere((t) => t.$3 == kind);
     final index = _local ?? (providerIndex < 0 ? 0 : providerIndex);
 
-    // شريط التابات الجاهز من الحزمة: زجاج نيتيف + عدسة بتتسحب بالصباع بين التابات (زي الواتساب).
-    // نفس عرض المشغل (هامش 12 من الجنبين).
+    // شريط التابات من المكتبة (نسخة معدّلة في packages/liquid_design): زجاج نيتيف + عدسة بتتسحب
+    // بالصباع. نفس عرض المشغل (هامش 12 من الجنبين).
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: LiquidGlassNavigationBar(
@@ -391,13 +451,20 @@ Future<void> _showMenu(
     barrierDismissible: true,
     barrierLabel: 'menu',
     barrierColor: Colors.black26,
-    transitionDuration: const Duration(milliseconds: 170),
-    // fade بس: الـ transforms على الـ platform view النيتيف بتبوّظ الزجاج وقت الحركة
-    transitionBuilder: (ctx, anim, _, child) => FadeTransition(
-      opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
-      child: child,
-    ),
-    pageBuilder: (ctx, _, __) {
+    transitionDuration: const Duration(milliseconds: 420),
+    // من غير transform على الزجاج: الحجم نفسه بيتفتح من زرار ⋯ (الأنيميشن جوّه pageBuilder)
+    transitionBuilder: (ctx, anim, _, child) => child,
+    pageBuilder: (ctx, animation, __) {
+      final t = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutBack,
+        reverseCurve: Curves.easeInCubic,
+      );
+      final fade = CurvedAnimation(
+        parent: animation,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+        reverseCurve: const Interval(0.0, 0.6),
+      );
       void pick(_Act a) {
         Navigator.of(ctx).pop();
         onSelected(a);
@@ -409,12 +476,28 @@ Future<void> _showMenu(
             alignment: AlignmentDirectional.topEnd,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 66, 16, 0),
-              child: SizedBox(
-                width: 264,
-                child: Glass(
-                  radius: 32,
-                  padding: const EdgeInsets.fromLTRB(0, 6, 0, 10),
-                  child: Material(
+              child: AnimatedBuilder(
+                  animation: animation,
+                  builder: (context, child) {
+                    // المنيو بيتفتح من الزرار: العرض والطول بيكبروا (مش scale) بحركة فيها ارتداد خفيف
+                    final k = (0.16 + 0.84 * t.value).clamp(0.0, 1.08);
+                    return Glass(
+                      radius: 32,
+                      padding: EdgeInsets.zero,
+                      child: Align(
+                        alignment: AlignmentDirectional.topEnd,
+                        widthFactor: k,
+                        heightFactor: k,
+                        child: Opacity(
+                          opacity: fade.value,
+                          child: SizedBox(width: 264, child: child),
+                        ),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 6, 0, 10),
+                    child: Material(
                     type: MaterialType.transparency,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -621,6 +704,7 @@ class FolderPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasCurrent =
         ref.watch(currentItemProvider.select((v) => v.value != null));
+    final s = ref.watch(stringsProvider);
 
     return Rtl(child: Scaffold(
       body: GlassBackground(
@@ -631,7 +715,7 @@ class FolderPage extends ConsumerWidget {
               Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 20, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
                     child: Row(
                       textDirection: TextDirection.ltr,
                       children: [
@@ -652,6 +736,20 @@ class FolderPage extends ConsumerWidget {
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.4,
                             ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // إضافة ملفات جوّه الفولدر ده بالذات
+                        GlassIconButton(
+                          icon: Icons.add_rounded,
+                          size: 46,
+                          iconSize: 26,
+                          onPressed: () => _import(
+                            context,
+                            s,
+                            () => ref
+                                .read(libraryProvider.notifier)
+                                .importFilesInto(path),
                           ),
                         ),
                       ],
