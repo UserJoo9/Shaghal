@@ -360,8 +360,9 @@ class _GlassSelectionBarState extends State<GlassSelectionBar>
       settings: widget.settings,
       builder: (context, settings) {
         final glassVisible = LiquidGlassService.isGlassVisible(settings);
-        _nativeLens =
-            glassVisible && LiquidGlassService.usesNativeLens(settings);
+        // العدسة النيتيف (platform view شفّاف فوق Flutter) كانت بتنزّل التحديث لحوالي 25 إطار/ث.
+        // فبنرسم العدسة بـ Flutter، وخلفية الشريط تفضل زجاج نيتيف.
+        _nativeLens = false;
         return SizedBox(
           height: widget.height,
           child: LayoutBuilder(
