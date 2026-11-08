@@ -30,6 +30,7 @@ class LibraryPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sections = ref.watch(sectionsProvider);
     final sort = ref.watch(sortModeProvider);
+    final kindTab = ref.watch(kindFilterProvider);
     final hasCurrent =
         ref.watch(currentItemProvider.select((v) => v.value != null));
 
@@ -43,7 +44,9 @@ class LibraryPage extends ConsumerWidget {
                 children: [
                   const _Header(),
                   Expanded(
-                    child: sort == SortMode.folder
+                    child: kindTab == KindFilter.favorites
+                        ? const _FavoritesBody()
+                        : sort == SortMode.folder
                         ? const _FolderBody(path: '')
                         : sections.when(
                             loading: () => const Center(
@@ -55,18 +58,118 @@ class LibraryPage extends ConsumerWidget {
                   ),
                 ],
               ),
+              const _BottomFade(height: 230),
               if (hasCurrent)
                 Positioned(
                   left: 12,
                   right: 12,
-                  bottom: MediaQuery.paddingOf(context).bottom + 8,
+                  bottom: MediaQuery.paddingOf(context).bottom + 86,
                   child: const MiniPlayer(),
                 ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: MediaQuery.paddingOf(context).bottom + 10,
+                child: const Center(child: _NavBar()),
+              ),
             ],
           ),
         ),
       ),
     ));
+  }
+}
+
+/// تدرّج أسود تحت القايمة عشان الصفوف تختفي بنعومة قبل الشريط العايم.
+class _BottomFade extends StatelessWidget {
+  const _BottomFade({required this.height});
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: height,
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0),
+                Colors.black.withValues(alpha: 0.88),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// شريط التابات الزجاجي: مزيكا / فيديو.
+class _NavBar extends ConsumerWidget {
+  const _NavBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final kind = ref.watch(kindFilterProvider);
+
+    Widget item(IconData icon, String label, KindFilter k) {
+      final sel = kind == k;
+      return Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => ref.read(kindFilterProvider.notifier).set(k),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              color: sel
+                  ? Colors.white.withValues(alpha: 0.18)
+                  : Colors.transparent,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon,
+                    size: 24, color: sel ? Colors.white : Colors.white54),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: sel ? Colors.white : Colors.white54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 330,
+      height: 66,
+      child: Glass(
+        radius: 33,
+        padding: EdgeInsets.zero,
+        child: Row(
+          children: [
+            item(Icons.music_note_rounded, 'المزيكا', KindFilter.audio),
+            item(Icons.videocam_rounded, 'الفيديو', KindFilter.video),
+            item(Icons.favorite_rounded, 'المفضلة', KindFilter.favorites),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -95,11 +198,14 @@ class _Header extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sort = ref.watch(sortModeProvider);
     final kind = ref.watch(kindFilterProvider);
-    final count = ref
-            .watch(sectionsProvider)
-            .value
-            ?.fold<int>(0, (n, s) => n + s.items.length) ??
-        0;
+    final isFav = kind == KindFilter.favorites;
+    final count = isFav
+        ? (ref.watch(favoriteItemsProvider).value?.length ?? 0)
+        : (ref
+                .watch(sectionsProvider)
+                .value
+                ?.fold<int>(0, (n, s) => n + s.items.length) ??
+            0);
 
     final sortLabel = switch (sort) {
       SortMode.folder => 'فولدرات',
@@ -110,6 +216,7 @@ class _Header extends ConsumerWidget {
       KindFilter.all => 'الكل',
       KindFilter.audio => 'صوت',
       KindFilter.video => 'فيديو',
+      KindFilter.favorites => 'المفضلة',
     };
 
     void onSelected(_Act a) {
@@ -145,8 +252,8 @@ class _Header extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'المكتبة',
+                Text(
+                  isFav ? 'المفضلة' : 'المكتبة',
                   style: TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.w800,
@@ -156,7 +263,9 @@ class _Header extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$sortLabel · $kindLabel · $count ملف',
+                  isFav
+                      ? 'المفضلة · $count ملف'
+                      : '$sortLabel · $kindLabel · $count ملف',
                   style: const TextStyle(fontSize: 13, color: Colors.white54),
                 ),
               ],
@@ -179,38 +288,72 @@ class _MenuLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 4),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
         child: Text(text, style: _sectionLabel),
       );
 }
 
 class _MenuItem extends StatelessWidget {
-  const _MenuItem(this.label, {this.icon, this.checked = false, required this.onTap});
+  const _MenuItem(
+    this.label, {
+    required this.icon,
+    this.checked = false,
+    required this.onTap,
+  });
   final String label;
-  final IconData? icon;
+  final IconData icon;
   final bool checked;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          child: Row(
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 20, color: Colors.white70),
-                const SizedBox(width: 12),
-              ],
-              Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
-              if (checked) const Icon(Icons.check_rounded, size: 20),
-            ],
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+        child: Material(
+          color:
+              checked ? Colors.white.withValues(alpha: 0.14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              height: 46,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 21, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (checked)
+                      const Icon(Icons.check_rounded, size: 20, color: Colors.white),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       );
 }
 
-/// قايمة زجاجية (Liquid Glass) بدل قايمة Material العادية.
+class _MenuDivider extends StatelessWidget {
+  const _MenuDivider();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
+        child: Container(height: 0.5, color: Colors.white.withValues(alpha: 0.22)),
+      );
+}
+
+/// قايمة Liquid Glass: لوح زجاج واحد، عناصر بأيقونات، والمختار بيتظلّل بكبسولة.
 Future<void> _showMenu(
   BuildContext context,
   SortMode sort,
@@ -221,17 +364,12 @@ Future<void> _showMenu(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'menu',
-    barrierColor: Colors.black45,
-    transitionDuration: const Duration(milliseconds: 180),
+    barrierColor: Colors.black26,
+    transitionDuration: const Duration(milliseconds: 170),
+    // fade بس: الـ transforms على الـ platform view النيتيف بتبوّظ الزجاج وقت الحركة
     transitionBuilder: (ctx, anim, _, child) => FadeTransition(
-      opacity: anim,
-      child: ScaleTransition(
-        scale: Tween<double>(begin: 0.94, end: 1).animate(
-          CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-        ),
-        alignment: Alignment.topLeft,
-        child: child,
-      ),
+      opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+      child: child,
     ),
     pageBuilder: (ctx, _, __) {
       void pick(_Act a) {
@@ -244,39 +382,32 @@ Future<void> _showMenu(
           child: Align(
             alignment: Alignment.topLeft,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 64, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 66, 16, 0),
               child: SizedBox(
-                width: 260,
+                width: 264,
                 child: Glass(
-                  radius: 28,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  radius: 32,
+                  padding: const EdgeInsets.fromLTRB(0, 6, 0, 10),
                   child: Material(
                     type: MaterialType.transparency,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const _MenuLabel('الفرز'),
                         _MenuItem('بالفولدرات',
+                            icon: Icons.folder_rounded,
                             checked: sort == SortMode.folder,
                             onTap: () => pick(_Act.sortFolder)),
                         _MenuItem('بالتاريخ',
+                            icon: Icons.calendar_today_rounded,
                             checked: sort == SortMode.date,
                             onTap: () => pick(_Act.sortDate)),
                         _MenuItem('بالاسم',
+                            icon: Icons.sort_by_alpha_rounded,
                             checked: sort == SortMode.name,
                             onTap: () => pick(_Act.sortName)),
-                        const Divider(height: 12, color: Colors.white24),
-                        const _MenuLabel('النوع'),
-                        _MenuItem('الكل',
-                            checked: kind == KindFilter.all,
-                            onTap: () => pick(_Act.kindAll)),
-                        _MenuItem('صوت',
-                            checked: kind == KindFilter.audio,
-                            onTap: () => pick(_Act.kindAudio)),
-                        _MenuItem('فيديو',
-                            checked: kind == KindFilter.video,
-                            onTap: () => pick(_Act.kindVideo)),
-                        const Divider(height: 12, color: Colors.white24),
+                        const _MenuDivider(),
                         _MenuItem('استيراد ملفات',
                             icon: Icons.audio_file_rounded,
                             onTap: () => pick(_Act.importFiles)),
@@ -415,7 +546,7 @@ class _FolderBody extends ConsumerWidget {
             0,
             4,
             0,
-            120 + MediaQuery.paddingOf(context).bottom,
+            200 + MediaQuery.paddingOf(context).bottom,
           ),
           itemCount: folderList.length + tracks.length,
           itemBuilder: (context, index) {
@@ -494,6 +625,7 @@ class FolderPage extends ConsumerWidget {
                   Expanded(child: _FolderBody(path: path)),
                 ],
               ),
+              const _BottomFade(height: 150),
               if (hasCurrent)
                 Positioned(
                   left: 12,
@@ -632,7 +764,7 @@ class _SectionList extends ConsumerWidget {
         0,
         4,
         0,
-        120 + MediaQuery.paddingOf(context).bottom,
+        200 + MediaQuery.paddingOf(context).bottom,
       ),
       itemCount: rows.length,
       itemBuilder: (context, index) {
@@ -675,6 +807,10 @@ class _TrackTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(
       currentItemProvider.select((v) => v.value?.path == item.path),
+    );
+
+    final fav = ref.watch(
+      favoritesProvider.select((f) => f.contains(favKey(item))),
     );
 
     return _FlatRow(
@@ -728,10 +864,140 @@ class _TrackTile extends ConsumerWidget {
               ],
             ),
           ),
-          if (item.isVideo)
-            const Icon(Icons.videocam_rounded, size: 18, color: Colors.white38),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => ref.read(favoritesProvider.notifier).toggle(item),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Icon(
+                fav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                size: 22,
+                color: fav ? const Color(0xFFFF2D55) : Colors.white38,
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+
+class _KindHeader {
+  const _KindHeader(this.title, this.icon, this.count);
+  final String title;
+  final IconData icon;
+  final int count;
+}
+
+/// تاب المفضلة: صوت ثم فيديو، وجوّه كل نوع الملفات متقسّمة بالفولدر (الفنان) ومترتبة بالاسم.
+class _FavoritesBody extends ConsumerWidget {
+  const _FavoritesBody();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fav = ref.watch(favoriteItemsProvider);
+
+    return fav.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('حصل خطأ: $e')),
+      data: (items) {
+        if (items.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Text(
+                'لسه مفيش مفضّلات.\nدوس على القلب ♥ جنب أي أغنية أو فيديو، أو من شاشة التشغيل، وهتلاقيه هنا.',
+                textAlign: TextAlign.center,
+                style: TextStyle(height: 1.7, color: Colors.white70),
+              ),
+            ),
+          );
+        }
+
+        final rows = <Object>[];
+        final queue = <MediaItem>[];
+
+        void addKind(String title, IconData icon, List<MediaItem> list) {
+          if (list.isEmpty) return;
+          rows.add(_KindHeader(title, icon, list.length));
+          final groups = <String, List<MediaItem>>{};
+          for (final i in list) {
+            groups.putIfAbsent(i.folder, () => []).add(i);
+          }
+          final keys = groups.keys.toList()
+            ..sort((a, b) => a.isEmpty
+                ? (b.isEmpty ? 0 : -1)
+                : (b.isEmpty ? 1 : naturalCompare(a, b)));
+          for (final k in keys) {
+            final g = groups[k]!
+              ..sort((a, b) => naturalCompare(a.name, b.name));
+            rows.add(_HeaderRow(k.isEmpty ? 'المجلد الرئيسي' : k, g.length));
+            for (final i in g) {
+              rows.add(_TrackRow(i, queue.length));
+              queue.add(i);
+            }
+          }
+        }
+
+        addKind('المزيكا', Icons.music_note_rounded,
+            items.where((i) => !i.isVideo).toList());
+        addKind('الفيديو', Icons.videocam_rounded,
+            items.where((i) => i.isVideo).toList());
+
+        return ListView.builder(
+          padding: EdgeInsets.fromLTRB(
+            0,
+            4,
+            0,
+            200 + MediaQuery.paddingOf(context).bottom,
+          ),
+          itemCount: rows.length,
+          itemBuilder: (context, index) {
+            final row = rows[index];
+            if (row is _KindHeader) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 2),
+                child: Row(
+                  children: [
+                    Icon(row.icon, size: 20, color: const Color(0xFF64B5FF)),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${row.title}  ·  ${row.count}',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            if (row is _HeaderRow) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+                child: Text(
+                  '${row.title}  ·  ${row.count}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white70,
+                  ),
+                ),
+              );
+            }
+            final t = row as _TrackRow;
+            return _TrackTile(
+              key: ValueKey(t.item.path),
+              item: t.item,
+              onTap: () async {
+                await ref.read(playerProvider).playQueue(queue, t.queueIndex);
+                if (t.item.isVideo && context.mounted) openFullPlayer(context);
+              },
+            );
+          },
+        );
+      },
     );
   }
 }

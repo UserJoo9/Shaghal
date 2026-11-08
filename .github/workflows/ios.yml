@@ -29,6 +29,21 @@ jobs:
         working-directory: app
         run: flutter build ios --release --no-codesign
 
+      # تشخيص: هل الزجاج النيتيف (UIGlassEffect) اتبنى فعلاً جوّه التطبيق؟
+      - name: Diagnose Liquid Glass support
+        working-directory: app
+        run: |
+          xcodebuild -version
+          echo "iphoneos SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+          found=0
+          for f in build/ios/iphoneos/Runner.app/Frameworks/*.framework; do
+            b="$f/$(basename "$f" .framework)"
+            if strings "$b" 2>/dev/null | grep -q UIGlassEffect; then
+              echo "UIGlassEffect FOUND in $b"; found=1
+            fi
+          done
+          if [ "$found" = "0" ]; then echo "UIGlassEffect NOT FOUND in any framework"; fi
+
       - name: Package IPA
         working-directory: app
         run: |

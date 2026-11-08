@@ -103,6 +103,8 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
     final ctrl = ref.watch(playerProvider);
     final item = ref.watch(currentItemProvider).value;
     final playing = ref.watch(playingProvider).value ?? false;
+    final isFav = item != null &&
+        ref.watch(favoritesProvider.select((f) => f.contains(favKey(item))));
 
     return Rtl(child: Scaffold(
       body: GlassBackground(
@@ -125,6 +127,18 @@ class _FullPlayerPageState extends ConsumerState<FullPlayerPage> {
                       ),
                     ),
                     const SizedBox(width: 12),
+                    if (item != null) ...[
+                      GlassIconButton(
+                        icon: isFav
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        size: 46,
+                        tint: isFav ? const Color(0xFFFF2D55) : null,
+                        onPressed: () =>
+                            ref.read(favoritesProvider.notifier).toggle(item),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
                     GlassIconButton(
                       icon: Icons.chevron_left_rounded,
                       size: 46,

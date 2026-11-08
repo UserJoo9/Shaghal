@@ -57,9 +57,9 @@ class GlassBackground extends ConsumerWidget {
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
-                _glow(const Alignment(-0.9, -0.85), const Color(0xFF6A4DFF), 0.30, 520),
-                _glow(const Alignment(1.0, -0.1), const Color(0xFF0A84FF), 0.22, 480),
-                _glow(const Alignment(-0.6, 0.95), const Color(0xFFFF3B8E), 0.16, 460),
+                _glow(const Alignment(-0.9, -0.85), const Color(0xFF6A4DFF), 0.42, 520),
+                _glow(const Alignment(1.0, -0.1), const Color(0xFF0A84FF), 0.32, 480),
+                _glow(const Alignment(-0.6, 0.95), const Color(0xFFFF3B8E), 0.26, 460),
               ],
             ),
           ),
@@ -94,7 +94,9 @@ class Glass extends StatelessWidget {
     return LiquidGlass(
       tintColor: tint,
       interactive: false,
+      brightness: LiquidGlassBrightness.dark,
       fallback: LiquidGlassFallback.frosted,
+      fallbackBlurSigma: 22,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(radius),
         child: Padding(padding: padding, child: child),

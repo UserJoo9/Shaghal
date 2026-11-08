@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:audio_session/audio_session.dart';
@@ -68,7 +69,7 @@ Future<String> libraryRootPath() async {
 
 enum SortMode { folder, date, name }
 
-enum KindFilter { all, audio, video }
+enum KindFilter { all, audio, video, favorites }
 
 class SortModeNotifier extends Notifier<SortMode> {
   @override
@@ -78,7 +79,7 @@ class SortModeNotifier extends Notifier<SortMode> {
 
 class KindFilterNotifier extends Notifier<KindFilter> {
   @override
-  KindFilter build() => KindFilter.all;
+  KindFilter build() => KindFilter.audio; // التابات: مزيكا / فيديو / مفضلة
   void set(KindFilter k) => state = k;
 }
 
@@ -117,6 +118,7 @@ final sectionsProvider = Provider<AsyncValue<List<MediaSection>>>((ref) {
     final items = all.where((i) {
       switch (kind) {
         case KindFilter.all:
+        case KindFilter.favorites:
           return true;
         case KindFilter.audio:
           return !i.isVideo;
@@ -155,6 +157,60 @@ final sectionsProvider = Provider<AsyncValue<List<MediaSection>>>((ref) {
         return [if (items.isNotEmpty) MediaSection('كل الملفات', items)];
     }
   });
+});
+
+
+// ───────────────────────── المفضلة ─────────────────────────
+
+/// مفتاح ثابت للملف (الفولدر النسبي + اسم الملف) عشان المفضلة تفضل صح
+/// حتى لو مسار الـ Documents على الجهاز اتغيّر بعد تحديث التطبيق.
+String favKey(MediaItem i) =>
+    p.posix.join(i.folder.replaceAll('\\', '/'), p.basename(i.path));
+
+class FavoritesNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() {
+    _load();
+    return <String>{};
+  }
+
+  Future<File> _file() async {
+    final d = await getApplicationSupportDirectory();
+    await d.create(recursive: true);
+    return File(p.join(d.path, 'favorites.json'));
+  }
+
+  Future<void> _load() async {
+    try {
+      final f = await _file();
+      if (await f.exists()) {
+        final list = jsonDecode(await f.readAsString()) as List;
+        state = {...state, ...list.cast<String>()};
+      }
+    } catch (_) {}
+  }
+
+  Future<void> toggle(MediaItem item) async {
+    final k = favKey(item);
+    final next = {...state};
+    if (!next.remove(k)) next.add(k);
+    state = next;
+    try {
+      await (await _file()).writeAsString(jsonEncode(next.toList()));
+    } catch (_) {}
+  }
+}
+
+final favoritesProvider =
+    NotifierProvider<FavoritesNotifier, Set<String>>(FavoritesNotifier.new);
+
+/// كل الملفات المفضّلة (اللي لسه موجودة في المكتبة).
+final favoriteItemsProvider = Provider<AsyncValue<List<MediaItem>>>((ref) {
+  final lib = ref.watch(libraryProvider);
+  final favs = ref.watch(favoritesProvider);
+  return lib.whenData(
+    (all) => all.where((i) => favs.contains(favKey(i))).toList(),
+  );
 });
 
 // ───────────────────────── المشغّل ─────────────────────────
