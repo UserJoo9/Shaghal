@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:liquid_design/liquid_design.dart';
 
@@ -149,7 +150,12 @@ class GlassIconButton extends StatelessWidget {
           height: size,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: onPressed,
+            onTap: onPressed == null
+                ? null
+                : () {
+                    HapticFeedback.selectionClick();
+                    onPressed!();
+                  },
             child: Center(child: Icon(icon,
                 size: iconSize,
                 color: tint != null ? Colors.white : context.fg)),

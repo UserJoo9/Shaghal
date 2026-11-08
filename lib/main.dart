@@ -5,6 +5,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:liquid_design/liquid_design.dart' show LiquidGlassService;
 import 'package:media_kit/media_kit.dart';
 
 import 'services/audio_handler.dart';
@@ -14,6 +15,9 @@ import 'ui/library_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  // حركة الزجاج (ضغط/سحب/ارتداد) أقوى شوية من الافتراضي، قريبة من تطبيقات النظام.
+  // الشفافية نفسها (شفاف/ملوّن) بتيجي من إعدادات النظام ومش بنتحكم فيها من التطبيق.
+  LiquidGlassService.instance.setInteractionStrength(1.3);
 
   final controller = PlayerController();
 
@@ -64,8 +68,6 @@ class ShaghalApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(glassClearProvider); // بيطبّق نمط الزجاج المحفوظ
-    ref.watch(glassOpacityProvider); // وشفافيته المحفوظة
     final mode = ref.watch(themeModeProvider);
     return MaterialApp(
       debugShowCheckedModeBanner: false,

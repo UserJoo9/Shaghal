@@ -6,8 +6,6 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:liquid_design/liquid_design.dart'
-    show LiquidGlassService, LiquidGlassStyle;
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path/path.dart' as p;
@@ -117,57 +115,7 @@ class S {
 final stringsProvider = Provider<S>((ref) => S(ref.watch(langProvider)));
 
 
-// ───────────────────────── نمط الزجاج ─────────────────────────
-
-/// true = زجاج شفاف (clear)، false = عادي (regular، ضبابي أكتر). بيتطبّق على كل الزجاج.
-class GlassClearNotifier extends Notifier<bool> {
-  @override
-  bool build() {
-    Future.microtask(() {
-      _apply(state);
-      _load();
-    });
-    return true;
-  }
-
-  void _apply(bool clear) {
-    LiquidGlassService.instance
-        .setStyle(clear ? LiquidGlassStyle.clear : LiquidGlassStyle.regular);
-  }
-
-  Future<File> _file() async {
-    final d = await getApplicationSupportDirectory();
-    await d.create(recursive: true);
-    return File(p.join(d.path, 'glass.txt'));
-  }
-
-  Future<void> _load() async {
-    try {
-      final f = await _file();
-      if (await f.exists()) {
-        final clear = (await f.readAsString()).trim() != 'regular';
-        if (clear != state) {
-          state = clear;
-          _apply(clear);
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> toggle() async {
-    state = !state;
-    _apply(state);
-    try {
-      await (await _file()).writeAsString(state ? 'clear' : 'regular');
-    } catch (_) {}
-  }
-}
-
-final glassClearProvider =
-    NotifierProvider<GlassClearNotifier, bool>(GlassClearNotifier.new);
-
-
-// ───────────────────────── المظهر وشفافية الزجاج ─────────────────────────
+// ───────────────────────── المظهر ─────────────────────────
 
 /// ملف إعدادات صغير (نص واحد) في مجلد التطبيق.
 Future<File> _prefFile(String name) async {
@@ -206,43 +154,6 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 
 final themeModeProvider =
     NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
-
-/// شفافية مادة الزجاج (0.3 – 1.0). 1.0 = الزجاج كامل الظهور.
-class GlassOpacityNotifier extends Notifier<double> {
-  @override
-  double build() {
-    Future.microtask(_load);
-    return 1.0;
-  }
-
-  Future<void> _load() async {
-    try {
-      final f = await _prefFile('glassopacity.txt');
-      if (await f.exists()) {
-        final v = double.tryParse((await f.readAsString()).trim());
-        if (v != null) {
-          state = v.clamp(0.3, 1.0);
-          LiquidGlassService.instance.setOpacity(state);
-        }
-      }
-    } catch (_) {}
-  }
-
-  void preview(double v) {
-    state = v.clamp(0.3, 1.0);
-    LiquidGlassService.instance.setOpacity(state);
-  }
-
-  Future<void> save() async {
-    try {
-      await (await _prefFile('glassopacity.txt'))
-          .writeAsString(state.toStringAsFixed(2));
-    } catch (_) {}
-  }
-}
-
-final glassOpacityProvider =
-    NotifierProvider<GlassOpacityNotifier, double>(GlassOpacityNotifier.new);
 
 // ───────────────────────── الفرز والفلترة ─────────────────────────
 

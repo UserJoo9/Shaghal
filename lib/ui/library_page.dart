@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:liquid_design/liquid_design.dart' show LiquidGlassService;
 import 'package:path/path.dart' as p;
@@ -32,6 +33,7 @@ class LibraryPage extends ConsumerWidget {
     final sections = ref.watch(sectionsProvider);
     final sort = ref.watch(sortModeProvider);
     final kindTab = ref.watch(kindFilterProvider);
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final s = ref.watch(stringsProvider);
     final hasCurrent =
         ref.watch(currentItemProvider.select((v) => v.value != null));
@@ -62,20 +64,22 @@ class LibraryPage extends ConsumerWidget {
                   ),
                 ],
               ),
-              const _BottomFade(height: 230),
-              if (hasCurrent)
+              if (!keyboardOpen) ...[
+                const _BottomFade(height: 230),
+                if (hasCurrent)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: MediaQuery.paddingOf(context).bottom + 88,
+                    child: const MiniPlayer(),
+                  ),
                 Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: MediaQuery.paddingOf(context).bottom + 86,
-                  child: const MiniPlayer(),
+                  left: 0,
+                  right: 0,
+                  bottom: MediaQuery.paddingOf(context).bottom + 10,
+                  child: const Center(child: _NavBar()),
                 ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: MediaQuery.paddingOf(context).bottom + 10,
-                child: const Center(child: _NavBar()),
-              ),
+              ],
             ],
           ),
         ),
@@ -114,7 +118,7 @@ class _BottomFade extends StatelessWidget {
   }
 }
 
-/// شريط التابات الزجاجي: مزيكا / فيديو.
+/// شريط التابات الزجاجي. المؤشر بينزلق بين التابات بحركة ارتداد خفيفة زي تطبيقات النظام.
 class _NavBar extends ConsumerWidget {
   const _NavBar();
 
@@ -123,56 +127,77 @@ class _NavBar extends ConsumerWidget {
     final kind = ref.watch(kindFilterProvider);
     final s = ref.watch(stringsProvider);
 
-    Widget item(IconData icon, String label, KindFilter k) {
-      final sel = kind == k;
-      return Expanded(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => ref.read(kindFilterProvider.notifier).set(k),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            margin: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              color: sel
-                  ? context.fgA(0.18)
-                  : Colors.transparent,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon,
-                    size: 24, color: sel ? context.fg : context.fg54),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: sel ? context.fg : context.fg54,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    final tabs = <(IconData, String, KindFilter)>[
+      (Icons.music_note_rounded, s.t('المزيكا', 'Music'), KindFilter.audio),
+      (Icons.videocam_rounded, s.t('الفيديو', 'Videos'), KindFilter.video),
+      (Icons.favorite_rounded, s.t('المفضلة', 'Favorites'), KindFilter.favorites),
+      (Icons.settings_rounded, s.t('الإعدادات', 'Settings'), KindFilter.settings),
+    ];
+    final index = tabs.indexWhere((t) => t.$3 == kind);
+    final width =
+        (MediaQuery.sizeOf(context).width - 24).clamp(0.0, 390.0).toDouble();
+    final itemW = (width - 10) / tabs.length;
 
     return SizedBox(
-      width: 348,
-      height: 66,
+      width: width,
+      height: 68,
       child: Glass(
         interactive: true,
-        radius: 33,
+        radius: 34,
         padding: EdgeInsets.zero,
-        child: Row(
+        child: Stack(
           children: [
-            item(Icons.music_note_rounded, s.t('المزيكا', 'Music'), KindFilter.audio),
-            item(Icons.videocam_rounded, s.t('الفيديو', 'Videos'), KindFilter.video),
-            item(Icons.favorite_rounded, s.t('المفضلة', 'Favorites'), KindFilter.favorites),
-            item(Icons.settings_rounded, s.t('الإعدادات', 'Settings'), KindFilter.settings),
+            AnimatedPositionedDirectional(
+              duration: const Duration(milliseconds: 420),
+              curve: Curves.easeOutBack,
+              start: 5 + (index < 0 ? 0 : index) * itemW,
+              top: 5,
+              bottom: 5,
+              width: itemW,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(29),
+                  color: context.fgA(index < 0 ? 0 : 0.16),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              child: Row(
+                children: [
+                  for (final t in tabs)
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          if (kind != t.$3) HapticFeedback.selectionClick();
+                          ref.read(kindFilterProvider.notifier).set(t.$3);
+                        },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              t.$1,
+                              size: 23,
+                              color: kind == t.$3 ? context.fg : context.fg54,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              t.$2,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: kind == t.$3 ? context.fg : context.fg54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -1158,17 +1183,9 @@ class _SettingsBody extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final lang = ref.watch(langProvider);
     final mode = ref.watch(themeModeProvider);
-    final clear = ref.watch(glassClearProvider);
-    final opacity = ref.watch(glassOpacityProvider);
 
     void setLang(AppLang l) {
       if (ref.read(langProvider) != l) ref.read(langProvider.notifier).toggle();
-    }
-
-    void setClear(bool c) {
-      if (ref.read(glassClearProvider) != c) {
-        ref.read(glassClearProvider.notifier).toggle();
-      }
     }
 
     return ListView(
@@ -1222,59 +1239,12 @@ class _SettingsBody extends ConsumerWidget {
             ),
           ],
         ),
-        _SettingsGroup(
-          title: s.t('الزجاج (Liquid Glass)', 'Liquid Glass'),
-          children: [
-            _ChoiceRow(
-              icon: Icons.blur_on_rounded,
-              label: s.t('شفاف', 'Clear'),
-              selected: clear,
-              onTap: () => setClear(true),
-            ),
-            _ChoiceRow(
-              icon: Icons.blur_circular_rounded,
-              label: s.t('عادي (ضبابي)', 'Regular (frosted)'),
-              selected: !clear,
-              onTap: () => setClear(false),
-            ),
-            SizedBox(
-              height: 56,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Icon(Icons.opacity_rounded, size: 22, color: context.fg),
-                    Expanded(
-                      child: Slider(
-                        value: opacity,
-                        min: 0.3,
-                        max: 1.0,
-                        onChanged: (v) =>
-                            ref.read(glassOpacityProvider.notifier).preview(v),
-                        onChangeEnd: (_) =>
-                            ref.read(glassOpacityProvider.notifier).save(),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 44,
-                      child: Text(
-                        '${(opacity * 100).round()}%',
-                        textAlign: TextAlign.end,
-                        style: TextStyle(fontSize: 13, color: context.fg54),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
             s.t(
-              'شفافية الزجاج النيتيف بتتأثر كمان بإعداد iPhone: الشاشة والسطوع ← Liquid Glass.',
-              'Native glass also follows your iPhone setting: Display & Brightness → Liquid Glass.',
+              'شفافية الزجاج (شفاف / ملوّن) بتتبع إعدادات الـ iPhone: الشاشة والسطوع ← Liquid Glass.',
+              'Glass transparency (Clear / Tinted) follows your iPhone settings: Display & Brightness → Liquid Glass.',
             ),
             style: TextStyle(fontSize: 12, height: 1.6, color: context.fg38),
           ),
