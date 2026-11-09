@@ -19,6 +19,10 @@ A black, Liquid Glass audio and video player for iPhone, built with Flutter. It 
   <img src="docs/screenshots/menu.png" width="23%" alt="Menu" />
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/nowplaying.png" width="60%" alt="Now playing in Control Center and the Dynamic Island" />
+</p>
+
 ## Features
 
 - **Plays (almost) everything.** Powered by [media_kit](https://pub.dev/packages/media_kit) (libmpv / FFmpeg), so formats Apple's AVPlayer refuses, such as Opus, MKV, FLAC, OGG and WebM, play without conversion.

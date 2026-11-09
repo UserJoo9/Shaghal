@@ -21,6 +21,10 @@
   <img src="docs/screenshots/menu.png" width="23%" alt="القائمة" />
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/nowplaying.png" width="60%" alt="التشغيل الحالي في مركز التحكم والجزيرة الديناميكية" />
+</p>
+
 ## المميزات
 
 - **بيشغّل (تقريباً) كل حاجة.** معتمد على [media_kit](https://pub.dev/packages/media_kit) (مبني على libmpv / FFmpeg)، فالصيغ اللي مشغّل Apple (AVPlayer) بيرفضها زي Opus وMKV وFLAC وOGG وWebM بتشتغل من غير تحويل.

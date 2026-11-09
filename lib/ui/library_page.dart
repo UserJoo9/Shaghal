@@ -10,6 +10,7 @@ import '../services/importer.dart' show ImportResult;
 import '../state/providers.dart';
 import 'artwork.dart';
 import 'glass.dart';
+import 'legal_page.dart';
 import 'now_playing.dart';
 
 sealed class _Row {}
@@ -610,15 +611,64 @@ Widget _emptyMessage(BuildContext context, S s) => Center(
     );
 
 /// محتوى فولدر: الفولدرات الفرعية الأول، وبعدها الأغاني اللي جواه مباشرة.
-class _FolderBody extends ConsumerWidget {
+class _FolderBody extends ConsumerStatefulWidget {
   const _FolderBody({required this.path});
   final String path; // فاضي = الجذر
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FolderBody> createState() => _FolderBodyState();
+}
+
+class _FolderBodyState extends ConsumerState<_FolderBody> {
+  final _ctrl = ScrollController();
+  final _firstKey = GlobalKey();
+  final _targetKey = GlobalKey();
+  double _rowH = 72;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _measure() {
+    final h = (_firstKey.currentContext ?? _targetKey.currentContext)
+        ?.size
+        ?.height;
+    if (h != null && h > 20) _rowH = h;
+  }
+
+  /// يوصّل للصف الشغّال: يقفز بالتقدير لحد ما الصف يتبني، وبعدين يظبطه في النص.
+  Future<void> _goTo(int index) async {
+    for (var i = 0; i < 4; i++) {
+      if (!mounted || !_ctrl.hasClients) return;
+      if (_targetKey.currentContext != null) break;
+      final est = (4 + _rowH * index)
+          .clamp(0.0, _ctrl.position.maxScrollExtent)
+          .toDouble();
+      await _ctrl.animateTo(est,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeInOut);
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    final ctx = _targetKey.currentContext;
+    if (ctx != null && ctx.mounted) {
+      await Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.4,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final path = widget.path;
     final lib = ref.watch(libraryProvider);
     final kind = ref.watch(kindFilterProvider);
     final s = ref.watch(stringsProvider);
+    final cur = ref.watch(currentItemProvider).value;
 
     return lib.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -657,7 +707,44 @@ class _FolderBody extends ConsumerWidget {
 
         if (folderList.isEmpty && tracks.isEmpty) return _emptyMessage(context, s);
 
-        return _scrollWatch(ref, ListView.builder(
+        // فهرس الصف اللي فيه الأغنية الشغّالة (الأغنية نفسها أو الفولدر اللي فيه)
+        var targetIndex = -1;
+        if (cur != null) {
+          final ti = tracks.indexWhere((t) => t.path == cur.path);
+          if (ti >= 0) {
+            targetIndex = folderList.length + ti;
+          } else {
+            final cp = cur.folder.isEmpty
+                ? const <String>[]
+                : p.split(cur.folder);
+            if (cp.length > target.length) {
+              var inside = true;
+              for (var k = 0; k < target.length; k++) {
+                if (cp[k] != target[k]) {
+                  inside = false;
+                  break;
+                }
+              }
+              if (inside) {
+                final fp = p.joinAll(cp.sublist(0, target.length + 1));
+                targetIndex = folderList.indexWhere((f) => f.path == fp);
+              }
+            }
+          }
+        }
+
+        WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+
+        Widget keyed(int index, Widget child) {
+          if (index == targetIndex) {
+            return KeyedSubtree(key: _targetKey, child: child);
+          }
+          if (index == 0) return KeyedSubtree(key: _firstKey, child: child);
+          return child;
+        }
+
+        final list = _scrollWatch(ref, ListView.builder(
+          controller: _ctrl,
           padding: EdgeInsets.fromLTRB(
             0,
             4,
@@ -668,28 +755,58 @@ class _FolderBody extends ConsumerWidget {
           itemBuilder: (context, index) {
             if (index < folderList.length) {
               final f = folderList[index];
-              return _FolderTile(
-                entry: f,
-                subtitle: s.t('${f.count} ملف', '${f.count} files'),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => FolderPage(path: f.path, title: f.name),
+              return keyed(
+                index,
+                _FolderTile(
+                  entry: f,
+                  subtitle: s.t('${f.count} ملف', '${f.count} files'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => FolderPage(path: f.path, title: f.name),
+                    ),
                   ),
                 ),
               );
             }
             final t = index - folderList.length;
             final item = tracks[t];
-            return _TrackTile(
-              key: ValueKey(item.path),
-              item: item,
-              onTap: () async {
-                await ref.read(playerProvider).playQueue(tracks, t);
-                if (item.isVideo && context.mounted) openFullPlayer(context);
-              },
+            return keyed(
+              index,
+              _TrackTile(
+                key: ValueKey(item.path),
+                item: item,
+                onTap: () async {
+                  await ref.read(playerProvider).playQueue(tracks, t);
+                  if (item.isVideo && context.mounted) openFullPlayer(context);
+                },
+              ),
             );
           },
         ));
+
+        if (targetIndex < 0) return list;
+
+        return Stack(
+          children: [
+            list,
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.paddingOf(context).bottom + 96,
+              child: Center(
+                child: GlassIconButton(
+                  icon: Icons.near_me_rounded,
+                  size: 46,
+                  iconSize: 22,
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    _goTo(targetIndex);
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
       },
     );
   }
@@ -1244,6 +1361,44 @@ class _ChoiceRow extends StatelessWidget {
   }
 }
 
+class _NavRow extends StatelessWidget {
+  const _NavRow({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 52,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(icon, size: 22, color: context.fg),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    size: 22, color: context.fg54),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SettingsBody extends ConsumerWidget {
   const _SettingsBody();
 
@@ -1327,6 +1482,18 @@ class _SettingsBody extends ConsumerWidget {
               onTap: () => ref
                   .read(glassStyleProvider.notifier)
                   .set(LiquidGlassStyle.regular),
+            ),
+          ],
+        ),
+        _SettingsGroup(
+          title: s.t('حول', 'About'),
+          children: [
+            _NavRow(
+              icon: Icons.description_outlined,
+              label: s.t('شروط الخدمة', 'Terms of Service'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TermsPage()),
+              ),
             ),
           ],
         ),
