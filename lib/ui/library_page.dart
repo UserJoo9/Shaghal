@@ -624,9 +624,35 @@ class _FolderBodyState extends ConsumerState<_FolderBody> {
   final _firstKey = GlobalKey();
   final _targetKey = GlobalKey();
   double _rowH = 72;
+  bool _onScreen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(_checkVisible);
+  }
+
+  /// الصف الشغّال ظاهر بالكامل على الشاشة؟ (الزرار يختفي وقتها)
+  void _checkVisible() {
+    var vis = false;
+    final ctx = _targetKey.currentContext;
+    if (ctx != null && ctx.mounted) {
+      final box = ctx.findRenderObject();
+      final vp = Scrollable.maybeOf(ctx)?.context.findRenderObject();
+      if (box is RenderBox &&
+          box.hasSize &&
+          vp is RenderBox &&
+          vp.hasSize) {
+        final top = box.localToGlobal(Offset.zero, ancestor: vp).dy;
+        vis = top >= 0 && top + box.size.height <= vp.size.height;
+      }
+    }
+    if (vis != _onScreen && mounted) setState(() => _onScreen = vis);
+  }
 
   @override
   void dispose() {
+    _ctrl.removeListener(_checkVisible);
     _ctrl.dispose();
     super.dispose();
   }
@@ -733,7 +759,10 @@ class _FolderBodyState extends ConsumerState<_FolderBody> {
           }
         }
 
-        WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _measure();
+          _checkVisible();
+        });
 
         Widget keyed(int index, Widget child) {
           if (index == targetIndex) {
@@ -794,7 +823,12 @@ class _FolderBodyState extends ConsumerState<_FolderBody> {
               right: 0,
               bottom: MediaQuery.paddingOf(context).bottom + 96,
               child: Center(
-                child: GlassIconButton(
+                child: IgnorePointer(
+                  ignoring: _onScreen,
+                  child: AnimatedOpacity(
+                    opacity: _onScreen ? 0 : 1,
+                    duration: const Duration(milliseconds: 200),
+                    child: GlassIconButton(
                   icon: Icons.near_me_rounded,
                   size: 46,
                   iconSize: 22,
@@ -802,6 +836,8 @@ class _FolderBodyState extends ConsumerState<_FolderBody> {
                     HapticFeedback.selectionClick();
                     _goTo(targetIndex);
                   },
+                    ),
+                  ),
                 ),
               ),
             ),
