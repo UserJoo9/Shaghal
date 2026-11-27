@@ -202,9 +202,16 @@ final glassStyleProvider =
 
 // ───────────────────────── الفرز والفلترة ─────────────────────────
 
+const kDownloadsFolder = 'Downloads';
+
+bool isDownloadsFolder(String folder) {
+  final norm = folder.replaceAll('\\', '/');
+  return norm == kDownloadsFolder || norm.startsWith('$kDownloadsFolder/');
+}
+
 enum SortMode { folder, date, name }
 
-enum KindFilter { all, audio, video, favorites, settings }
+enum KindFilter { all, audio, video, download, converter, favorites, settings }
 
 class SortModeNotifier extends Notifier<SortMode> {
   @override
@@ -259,6 +266,8 @@ final sectionsProvider = Provider<AsyncValue<List<MediaSection>>>((ref) {
     final items = all.where((i) {
       switch (kind) {
         case KindFilter.all:
+        case KindFilter.download:
+        case KindFilter.converter:
         case KindFilter.favorites:
         case KindFilter.settings:
           return true;
@@ -282,7 +291,11 @@ final sectionsProvider = Provider<AsyncValue<List<MediaSection>>>((ref) {
         return [
           for (final e in byFolder.entries)
             MediaSection(
-              e.key.isEmpty ? s.t('المجلد الرئيسي', 'Main folder') : e.key,
+              e.key.isEmpty
+                  ? s.t('المجلد الرئيسي', 'Main folder')
+                  : (e.key == kDownloadsFolder
+                      ? s.t('التحميلات', 'Downloads')
+                      : e.key),
               e.value..sort((a, b) => naturalCompare(a.name, b.name)),
             ),
         ];
@@ -531,3 +544,71 @@ final scrollingProvider =
 final thumbProvider = FutureProvider.family<String?, String>(
   (ref, path) => Thumbnails.get(path),
 );
+
+// ───────────────────────── التحميل والمشاركة ─────────────────────────
+
+/// رابط جاي من Share Sheet أو Deep Link (shaghal://download?url=...).
+class IncomingShareUrlNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? url) => state = url;
+  void clear() => state = null;
+}
+
+final incomingShareUrlProvider =
+    NotifierProvider<IncomingShareUrlNotifier, String?>(
+  IncomingShareUrlNotifier.new,
+);
+
+/// فولدرات الصوت المتاحة في المكتبة (باستثناء Downloads).
+final audioFoldersProvider = Provider<List<String>>((ref) {
+  final all = ref.watch(libraryProvider).value ?? const <MediaItem>[];
+  final set = <String>{};
+  for (final i in all) {
+    if (!i.isVideo && i.folder.isNotEmpty && !isDownloadsFolder(i.folder)) {
+      set.add(i.folder);
+    }
+  }
+  return set.toList()..sort(naturalCompare);
+});
+
+/// فولدرات الفيديو المتاحة في المكتبة (باستثناء Downloads).
+final videoFoldersProvider = Provider<List<String>>((ref) {
+  final all = ref.watch(libraryProvider).value ?? const <MediaItem>[];
+  final set = <String>{};
+  for (final i in all) {
+    if (i.isVideo && i.folder.isNotEmpty && !isDownloadsFolder(i.folder)) {
+      set.add(i.folder);
+    }
+  }
+  return set.toList()..sort(naturalCompare);
+});
+
+/// رابط سيرفر استخراج خارجي اختياري (Cobalt / yt-dlp API) لو المستخدم أضافه في الإعدادات.
+class CustomApiUrlNotifier extends Notifier<String> {
+  @override
+  String build() {
+    _load();
+    return '';
+  }
+
+  Future<void> _load() async {
+    try {
+      final f = await _prefFile('extractor_api.txt');
+      if (await f.exists()) {
+        state = (await f.readAsString()).trim();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> set(String url) async {
+    final clean = url.trim();
+    state = clean;
+    try {
+      await (await _prefFile('extractor_api.txt')).writeAsString(clean);
+    } catch (_) {}
+  }
+}
+
+final customApiUrlProvider =
+    NotifierProvider<CustomApiUrlNotifier, String>(CustomApiUrlNotifier.new);

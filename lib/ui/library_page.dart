@@ -6,9 +6,13 @@ import 'package:liquid_design/liquid_design.dart'
 import 'package:path/path.dart' as p;
 
 import '../models/media_item.dart';
+import '../services/download_manager.dart';
 import '../services/importer.dart' show ImportResult;
+import '../services/media_converter.dart';
 import '../state/providers.dart';
 import 'artwork.dart';
+import 'converter_page.dart';
+import 'download_page.dart';
 import 'glass.dart';
 import 'legal_page.dart';
 import 'now_playing.dart';
@@ -53,25 +57,32 @@ class LibraryPage extends ConsumerWidget {
                     child: _TabSwitcher(
                       index: switch (kindTab) {
                         KindFilter.video => 1,
-                        KindFilter.favorites => 2,
-                        KindFilter.settings => 3,
+                        KindFilter.download => 2,
+                        KindFilter.converter => 3,
+                        KindFilter.favorites => 4,
+                        KindFilter.settings => 5,
                         _ => 0,
                       },
                       child: kindTab == KindFilter.settings
                           ? const _SettingsBody()
-                          : kindTab == KindFilter.favorites
-                              ? const _FavoritesBody()
-                              : sort == SortMode.folder
-                                  ? const _FolderBody(path: '')
-                                  : sections.when(
-                                      loading: () => const Center(
-                                          child: CircularProgressIndicator()),
-                                      error: (e, _) => Center(
-                                          child: Text(
-                                              '${s.t('حصل خطأ', 'Error')}: $e')),
-                                      data: (data) =>
-                                          _SectionList(sections: data),
-                                    ),
+                          : kindTab == KindFilter.download
+                              ? const DownloadBody()
+                              : kindTab == KindFilter.converter
+                                  ? const ConverterBody()
+                                  : kindTab == KindFilter.favorites
+                                      ? const _FavoritesBody()
+                                      : sort == SortMode.folder
+                                          ? const _FolderBody(path: '')
+                                          : sections.when(
+                                              loading: () => const Center(
+                                                  child:
+                                                      CircularProgressIndicator()),
+                                              error: (e, _) => Center(
+                                                  child: Text(
+                                                      '${s.t('حصل خطأ', 'Error')}: $e')),
+                                              data: (data) =>
+                                                  _SectionList(sections: data),
+                                            ),
                     ),
                   ),
                 ],
@@ -202,7 +213,9 @@ class _NavBarState extends ConsumerState<_NavBar> {
     final tabs = <(IconData, String, KindFilter)>[
       (Icons.music_note_rounded, s.t('المزيكا', 'Music'), KindFilter.audio),
       (Icons.videocam_rounded, s.t('الفيديو', 'Videos'), KindFilter.video),
-      (Icons.favorite_rounded, s.t('المفضلة', 'Favorites'), KindFilter.favorites),
+      (Icons.download_rounded, s.t('تحميل', 'Download'), KindFilter.download),
+      (Icons.transform_rounded, s.t('تحويل', 'Convert'), KindFilter.converter),
+      (Icons.favorite_rounded, s.t('المفضلة', 'Favs'), KindFilter.favorites),
       (Icons.settings_rounded, s.t('الإعدادات', 'Settings'), KindFilter.settings),
     ];
     final providerIndex = tabs.indexWhere((t) => t.$3 == kind);
@@ -263,20 +276,45 @@ class _Header extends ConsumerWidget {
     final sort = ref.watch(sortModeProvider);
     final kind = ref.watch(kindFilterProvider);
     final s = ref.watch(stringsProvider);
-    if (kind == KindFilter.settings) {
+    if (kind == KindFilter.settings ||
+        kind == KindFilter.download ||
+        kind == KindFilter.converter) {
+      final isDl = kind == KindFilter.download;
+      final isConv = kind == KindFilter.converter;
+      final count = isDl
+          ? ref.watch(downloadsProvider).length
+          : (isConv ? ref.watch(converterProvider).length : 0);
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 10, 16, 8),
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                s.t('الإعدادات', 'Settings'),
-                style: const TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                  height: 1.15,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isDl
+                        ? s.t('التحميل', 'Downloads')
+                        : (isConv
+                            ? s.t('المحول', 'Converter')
+                            : s.t('الإعدادات', 'Settings')),
+                    style: const TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                      height: 1.15,
+                    ),
+                  ),
+                  if (isDl || isConv) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      isDl
+                          ? s.t('$count عملية تحميل', '$count downloads')
+                          : s.t('$count عملية تحويل', '$count conversions'),
+                      style: TextStyle(fontSize: 13, color: context.fg54),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -301,6 +339,8 @@ class _Header extends ConsumerWidget {
       KindFilter.all => s.t('الكل', 'All'),
       KindFilter.audio => s.t('صوت', 'Audio'),
       KindFilter.video => s.t('فيديو', 'Video'),
+      KindFilter.download => s.t('تحميل', 'Download'),
+      KindFilter.converter => s.t('تحويل', 'Convert'),
       KindFilter.favorites => s.t('المفضلة', 'Favorites'),
       KindFilter.settings => s.t('الإعدادات', 'Settings'),
     };
@@ -703,10 +743,15 @@ class _FolderBodyState extends ConsumerState<_FolderBody> {
         final target = path.isEmpty ? const <String>[] : p.split(path);
         final folders = <String, _FolderEntry>{};
         final tracks = <MediaItem>[];
+        final downloadTracks = <MediaItem>[];
 
         for (final i in all) {
           if (kind == KindFilter.audio && i.isVideo) continue;
           if (kind == KindFilter.video && !i.isVideo) continue;
+          if (path.isEmpty && isDownloadsFolder(i.folder)) {
+            downloadTracks.add(i);
+            continue;
+          }
           final parts = i.folder.isEmpty ? const <String>[] : p.split(i.folder);
           if (parts.length < target.length) continue;
           var inside = true;
@@ -729,31 +774,51 @@ class _FolderBodyState extends ConsumerState<_FolderBody> {
 
         final folderList = folders.values.toList()
           ..sort((a, b) => naturalCompare(a.name, b.name));
+        downloadTracks.sort((a, b) => naturalCompare(a.name, b.name));
         tracks.sort((a, b) => naturalCompare(a.name, b.name));
 
-        if (folderList.isEmpty && tracks.isEmpty) return _emptyMessage(context, s);
+        if (folderList.isEmpty && downloadTracks.isEmpty && tracks.isEmpty) {
+          return _emptyMessage(context, s);
+        }
+
+        final rows = <Object>[
+          ...folderList,
+          if (downloadTracks.isNotEmpty) ...[
+            _HeaderRow(s.t('التحميلات', 'Downloads'), downloadTracks.length),
+            for (var idx = 0; idx < downloadTracks.length; idx++)
+              _TrackRow(downloadTracks[idx], idx),
+          ],
+          for (var idx = 0; idx < tracks.length; idx++) tracks[idx],
+        ];
 
         // فهرس الصف اللي فيه الأغنية الشغّالة (الأغنية نفسها أو الفولدر اللي فيه)
         var targetIndex = -1;
         if (cur != null) {
-          final ti = tracks.indexWhere((t) => t.path == cur.path);
-          if (ti >= 0) {
-            targetIndex = folderList.length + ti;
+          if (path.isEmpty && isDownloadsFolder(cur.folder)) {
+            final di = downloadTracks.indexWhere((t) => t.path == cur.path);
+            if (di >= 0) targetIndex = folderList.length + 1 + di;
           } else {
-            final cp = cur.folder.isEmpty
-                ? const <String>[]
-                : p.split(cur.folder);
-            if (cp.length > target.length) {
-              var inside = true;
-              for (var k = 0; k < target.length; k++) {
-                if (cp[k] != target[k]) {
-                  inside = false;
-                  break;
+            final ti = tracks.indexWhere((t) => t.path == cur.path);
+            if (ti >= 0) {
+              final dlOffset =
+                  downloadTracks.isEmpty ? 0 : 1 + downloadTracks.length;
+              targetIndex = folderList.length + dlOffset + ti;
+            } else {
+              final cp = cur.folder.isEmpty
+                  ? const <String>[]
+                  : p.split(cur.folder);
+              if (cp.length > target.length) {
+                var inside = true;
+                for (var k = 0; k < target.length; k++) {
+                  if (cp[k] != target[k]) {
+                    inside = false;
+                    break;
+                  }
                 }
-              }
-              if (inside) {
-                final fp = p.joinAll(cp.sublist(0, target.length + 1));
-                targetIndex = folderList.indexWhere((f) => f.path == fp);
+                if (inside) {
+                  final fp = p.joinAll(cp.sublist(0, target.length + 1));
+                  targetIndex = folderList.indexWhere((f) => f.path == fp);
+                }
               }
             }
           }
@@ -780,25 +845,65 @@ class _FolderBodyState extends ConsumerState<_FolderBody> {
             0,
             200 + MediaQuery.paddingOf(context).bottom,
           ),
-          itemCount: folderList.length + tracks.length,
+          itemCount: rows.length,
           itemBuilder: (context, index) {
-            if (index < folderList.length) {
-              final f = folderList[index];
+            final row = rows[index];
+            if (row is _FolderEntry) {
               return keyed(
                 index,
                 _FolderTile(
-                  entry: f,
-                  subtitle: s.t('${f.count} ملف', '${f.count} files'),
+                  entry: row,
+                  subtitle: s.t('${row.count} ملف', '${row.count} files'),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => FolderPage(path: f.path, title: f.name),
+                      builder: (_) => FolderPage(path: row.path, title: row.name),
                     ),
                   ),
                 ),
               );
             }
-            final t = index - folderList.length;
-            final item = tracks[t];
+            if (row is _HeaderRow) {
+              return keyed(
+                index,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.download_rounded,
+                          size: 18, color: Color(0xFF64B5FF)),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${row.title}  ·  ${row.count}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: context.fg70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            if (row is _TrackRow) {
+              return keyed(
+                index,
+                _TrackTile(
+                  key: ValueKey(row.item.path),
+                  item: row.item,
+                  onTap: () async {
+                    await ref
+                        .read(playerProvider)
+                        .playQueue(downloadTracks, row.queueIndex);
+                    if (row.item.isVideo && context.mounted) {
+                      openFullPlayer(context);
+                    }
+                  },
+                ),
+              );
+            }
+            final item = row as MediaItem;
+            final t = tracks.indexOf(item);
             return keyed(
               index,
               _TrackTile(
@@ -1238,7 +1343,12 @@ class _FavoritesBody extends ConsumerWidget {
             final g = groups[k]!
               ..sort((a, b) => naturalCompare(a.name, b.name));
             rows.add(_HeaderRow(
-                k.isEmpty ? s.t('المجلد الرئيسي', 'Main folder') : k, g.length));
+                k.isEmpty
+                    ? s.t('المجلد الرئيسي', 'Main folder')
+                    : (k == kDownloadsFolder
+                        ? s.t('التحميلات', 'Downloads')
+                        : k),
+                g.length));
             for (final i in g) {
               rows.add(_TrackRow(i, queue.length));
               queue.add(i);
@@ -1518,6 +1628,46 @@ class _SettingsBody extends ConsumerWidget {
               onTap: () => ref
                   .read(glassStyleProvider.notifier)
                   .set(LiquidGlassStyle.regular),
+            ),
+          ],
+        ),
+        _SettingsGroup(
+          title: s.t('التحميل', 'Downloader'),
+          children: [
+            _NavRow(
+              icon: Icons.cloud_download_outlined,
+              label: s.t('سيرفر استخراج خارجي (اختياري)', 'Extractor API (Optional)'),
+              onTap: () async {
+                final cur = ref.read(customApiUrlProvider);
+                final ctrl = TextEditingController(text: cur);
+                final saved = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text(s.t('رابط سيرفر الاستخراج', 'Extractor API URL')),
+                    content: TextField(
+                      controller: ctrl,
+                      keyboardType: TextInputType.url,
+                      decoration: InputDecoration(
+                        hintText: 'https://your-cobalt-or-ytdlp-api.example',
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: Text(s.t('إلغاء', 'Cancel')),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                        child: Text(s.t('حفظ', 'Save')),
+                      ),
+                    ],
+                  ),
+                );
+                if (saved != null) {
+                  await ref.read(customApiUrlProvider.notifier).set(saved);
+                }
+                ctrl.dispose();
+              },
             ),
           ],
         ),

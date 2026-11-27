@@ -10,6 +10,7 @@ import 'package:liquid_design/liquid_design.dart' show LiquidGlassService, Liqui
 import 'package:media_kit/media_kit.dart';
 
 import 'services/audio_handler.dart';
+import 'services/native_bridge.dart';
 import 'state/providers.dart';
 import 'ui/library_page.dart';
 
@@ -94,11 +95,32 @@ class _NoParallaxTransitions extends PageTransitionsBuilder {
   }
 }
 
-class ShaghalApp extends ConsumerWidget {
+class ShaghalApp extends ConsumerStatefulWidget {
   const ShaghalApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ShaghalApp> createState() => _ShaghalAppState();
+}
+
+class _ShaghalAppState extends ConsumerState<ShaghalApp> {
+  @override
+  void initState() {
+    super.initState();
+    NativeBridge.instance.initShareListener((url) {
+      if (!mounted) return;
+      ref.read(incomingShareUrlProvider.notifier).set(url);
+      ref.read(kindFilterProvider.notifier).set(KindFilter.download);
+    });
+  }
+
+  @override
+  void dispose() {
+    NativeBridge.instance.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final mode = ref.watch(themeModeProvider);
     // أول ما المكتبة تتحمّل، نرجّع آخر أغنية كانت شغّالة
     ref.listen(libraryProvider, (_, next) {

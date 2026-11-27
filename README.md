@@ -34,7 +34,9 @@ A black, Liquid Glass audio and video player for iPhone, built with Flutter. It 
 - **Background playback.**
 - **Swipe from the left edge to go back.**
 - **Arabic and English UI** with a one-tap language switch (right-to-left / left-to-right).
-- **Tabs and favorites.** A glass tab bar splits **Music**, **Videos** and **Favorites**; tap the heart on any track or in the player to favorite it.
+- **Tabs and favorites.** A glass tab bar splits **Music**, **Videos**, **Download**, **Convert**, **Favorites**, and **Settings**; tap the heart on any track or in the player to favorite it.
+- **Built-in Downloader & Internal Browser.** Paste any link or browse any platform directly inside the **Download** tab, or use the iOS **Share Sheet** (`Share → Shaghal`) to jump straight to downloading. Pick any available **video or audio quality**, and choose an existing Audio/Video folder (or save to the default **Downloads** section on the home screen).
+- **Audio & Video Converter.** Convert audio and video files between any formats (`MP3`, `M4A`, `OPUS`, `OGG`, `FLAC`, `WAV`, `MP4`, `MKV`, `MOV`, `WEBM`, `AVI`, etc.) via FFmpeg. Convert an entire folder at once (saved in `<Folder> converted`) or pick individual files (saved into a new folder).
 - **In-app import** of files and folders, plus Files-app access to the app's folder.
 
 ## Supported formats
