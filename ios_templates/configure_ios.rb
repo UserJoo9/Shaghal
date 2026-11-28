@@ -90,8 +90,18 @@ unless project.targets.any? { |t| t.name == 'ShareExtension' }
     embed_phase.dst_subfolder_spec = '13'
     embed_phase.dst_path = ''
   end
-  build_file = embed_phase.add_file_reference(ext_target.product_reference)
-  build_file.settings = { 'ATTRIBUTES' => ['RemoveHeadersOnCopy'] }
+  unless embed_phase.files.any? { |f| f.file_ref == ext_target.product_reference }
+    build_file = embed_phase.add_file_reference(ext_target.product_reference)
+    build_file.settings = { 'ATTRIBUTES' => ['RemoveHeadersOnCopy'] }
+  end
+
+  # Place "Embed Foundation Extensions" before "Thin Binary" to avoid Xcode's
+  # "Cycle inside Runner" error (Copy .appex -> Thin Binary -> ProcessInfoPlistFile -> Copy .appex).
+  thin_idx = runner_target.build_phases.index { |p| p.respond_to?(:name) && p.name == 'Thin Binary' }
+  embed_idx = runner_target.build_phases.index(embed_phase)
+  if thin_idx && embed_idx && embed_idx > thin_idx
+    runner_target.build_phases.move(embed_phase, thin_idx)
+  end
 end
 
 project.save
