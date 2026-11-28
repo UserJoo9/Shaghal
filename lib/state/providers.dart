@@ -56,6 +56,85 @@ class LibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     await refresh();
     return r;
   }
+
+  /// يحذف ملف نهائياً من الجهاز ويحدّث الحالة والمفضلة والمشغّل فوراً.
+  Future<void> deleteItem(MediaItem item) async {
+    await ref.read(playerProvider).onFileDeleted(item.path);
+    await ref.read(favoritesProvider.notifier).removeKey(favKey(item));
+    final f = File(item.path);
+    if (await f.exists()) {
+      await f.delete();
+    }
+    final cur = state.value;
+    if (cur != null) {
+      state = AsyncData(cur.where((x) => x.path != item.path).toList());
+    } else {
+      await refresh();
+    }
+  }
+
+  /// ينقل ملف أو مجموعة ملفات إلى فولدر آخر ('' = المجلد الرئيسي).
+  Future<int> moveItems(List<MediaItem> items, String destRelFolder) async {
+    if (items.isEmpty) return 0;
+    final root = await libraryRootPath();
+    final destDir = destRelFolder.isEmpty ? root : p.join(root, destRelFolder);
+    await Directory(destDir).create(recursive: true);
+
+    var moved = 0;
+    final updatedByOldPath = <String, MediaItem>{};
+
+    for (final item in items) {
+      if (item.folder == destRelFolder) continue;
+      final src = File(item.path);
+      if (!await src.exists()) continue;
+
+      final newPath = _uniqueMovePath(destDir, p.basename(item.path));
+      try {
+        await src.rename(newPath);
+      } on FileSystemException {
+        await src.copy(newPath);
+        await src.delete();
+      }
+
+      final newItem = MediaItem(
+        path: newPath,
+        folder: destRelFolder,
+        modified: item.modified,
+        size: item.size,
+        isVideo: item.isVideo,
+      );
+      updatedByOldPath[item.path] = newItem;
+      await ref
+          .read(favoritesProvider.notifier)
+          .remapKey(favKey(item), favKey(newItem));
+      await ref.read(playerProvider).onFileMoved(item.path, newItem);
+      moved++;
+    }
+
+    if (moved > 0) {
+      final cur = state.value;
+      if (cur != null) {
+        state = AsyncData([
+          for (final x in cur) updatedByOldPath[x.path] ?? x,
+        ]);
+      } else {
+        await refresh();
+      }
+    }
+    return moved;
+  }
+
+  String _uniqueMovePath(String dir, String fileName) {
+    final base = p.basenameWithoutExtension(fileName);
+    final ext = p.extension(fileName);
+    var candidate = p.join(dir, fileName);
+    var n = 2;
+    while (File(candidate).existsSync()) {
+      candidate = p.join(dir, '$base ($n)$ext');
+      n++;
+    }
+    return candidate;
+  }
 }
 
 /// جذر المكتبة. iOS: Documents بتاع التطبيق (بيظهر في تطبيق «الملفات»).
@@ -75,6 +154,30 @@ Future<String> libraryRootPath() async {
     );
   }
   return docs.path;
+}
+
+/// يجمع كل الفولدرات الموجودة داخل جذر المكتبة (بما فيها الفولدرات الفاضية).
+Future<List<String>> listLibraryFolders() async {
+  final root = await libraryRootPath();
+  final out = <String>{};
+  final pending = <Directory>[Directory(root)];
+  while (pending.isNotEmpty) {
+    final dir = pending.removeLast();
+    List<FileSystemEntity> entries;
+    try {
+      entries = dir.listSync(followLinks: false);
+    } on FileSystemException {
+      continue;
+    }
+    for (final e in entries) {
+      if (e is! Directory) continue;
+      if (p.basename(e.path).startsWith('.')) continue;
+      final rel = p.relative(e.path, from: root);
+      if (rel != '.' && rel.isNotEmpty) out.add(rel);
+      pending.add(e);
+    }
+  }
+  return out.toList()..sort(naturalCompare);
 }
 
 
@@ -355,6 +458,24 @@ class FavoritesNotifier extends Notifier<Set<String>> {
       await (await _file()).writeAsString(jsonEncode(next.toList()));
     } catch (_) {}
   }
+
+  Future<void> removeKey(String key) async {
+    if (!state.contains(key)) return;
+    final next = {...state}..remove(key);
+    state = next;
+    try {
+      await (await _file()).writeAsString(jsonEncode(next.toList()));
+    } catch (_) {}
+  }
+
+  Future<void> remapKey(String oldKey, String newKey) async {
+    if (!state.contains(oldKey) || oldKey == newKey) return;
+    final next = {...state}..remove(oldKey)..add(newKey);
+    state = next;
+    try {
+      await (await _file()).writeAsString(jsonEncode(next.toList()));
+    } catch (_) {}
+  }
 }
 
 final favoritesProvider =
@@ -459,6 +580,55 @@ class PlayerController {
     await player.open(
       Playlist([for (final i in items) Media(i.path)], index: index),
     );
+  }
+
+  Future<void> onFileDeleted(String path) async {
+    final cur = itemFor(player.state.playlist);
+    if (cur?.path == path) {
+      queue = const [];
+      _lastKey = null;
+      await player.stop();
+      try {
+        final f = await _prefFile('last_play.json');
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+      return;
+    }
+    if (queue.any((t) => t.path == path)) {
+      queue = queue.where((t) => t.path != path).toList();
+      await saveState();
+    }
+  }
+
+  Future<void> onFileMoved(String oldPath, MediaItem updated) async {
+    if (!queue.any((t) => t.path == oldPath)) return;
+    final wasCurrent = itemFor(player.state.playlist)?.path == oldPath;
+    final pos = player.state.position;
+    final wasPlaying = player.state.playing;
+    queue = [
+      for (final t in queue)
+        if (t.path == oldPath) updated else t,
+    ];
+    if (wasCurrent) {
+      final idx = queue.indexWhere((t) => t.path == updated.path);
+      if (idx >= 0) {
+        await player.open(
+          Playlist([for (final i in queue) Media(i.path)], index: idx),
+          play: wasPlaying,
+        );
+        if (pos > Duration.zero) {
+          try {
+            if (player.state.duration == Duration.zero) {
+              await player.stream.duration
+                  .firstWhere((d) => d > Duration.zero)
+                  .timeout(const Duration(seconds: 4));
+            }
+            await player.seek(pos);
+          } catch (_) {}
+        }
+      }
+    }
+    await saveState();
   }
 
   /// العنصر الحالي من الـ playlist. بنطابق بالمسار (مش بالرقم) عشان الـ shuffle

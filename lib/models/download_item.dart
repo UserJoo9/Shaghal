@@ -21,6 +21,7 @@ class MediaFormatOption {
     this.headers = const {},
     this.ytVideoStream,
     this.ytAudioStream,
+    this.ytMuxedFallback,
   });
 
   final String id;
@@ -40,6 +41,7 @@ class MediaFormatOption {
   final Map<String, String> headers;
   final StreamInfo? ytVideoStream;
   final AudioOnlyStreamInfo? ytAudioStream;
+  final MuxedStreamInfo? ytMuxedFallback;
 
   bool get needsMux =>
       isVideo &&
@@ -88,6 +90,8 @@ class DownloadTask {
     required this.targetFolder,
     required this.status,
     required this.createdAt,
+    this.thumbnailUrl,
+    this.author,
     this.progress = 0,
     this.receivedBytes = 0,
     this.totalBytes,
@@ -105,6 +109,8 @@ class DownloadTask {
   final String targetFolder;
   final DownloadTaskStatus status;
   final DateTime createdAt;
+  final String? thumbnailUrl;
+  final String? author;
   final double progress;
   final int receivedBytes;
   final int? totalBytes;
@@ -129,11 +135,48 @@ class DownloadTask {
       targetFolder: targetFolder,
       status: status ?? this.status,
       createdAt: createdAt,
+      thumbnailUrl: thumbnailUrl,
+      author: author,
       progress: progress ?? this.progress,
       receivedBytes: receivedBytes ?? this.receivedBytes,
       totalBytes: totalBytes ?? this.totalBytes,
       statusDetail: statusDetail ?? this.statusDetail,
       outputPath: outputPath ?? this.outputPath,
+      errorMessage: errorMessage ?? this.errorMessage,
+    );
+  }
+}
+
+enum PendingShareStatus { analyzing, ready, failed }
+
+class PendingShareItem {
+  const PendingShareItem({
+    required this.id,
+    required this.url,
+    required this.status,
+    required this.addedAt,
+    this.media,
+    this.errorMessage,
+  });
+
+  final String id;
+  final String url;
+  final PendingShareStatus status;
+  final DateTime addedAt;
+  final ExtractedMedia? media;
+  final String? errorMessage;
+
+  PendingShareItem copyWith({
+    PendingShareStatus? status,
+    ExtractedMedia? media,
+    String? errorMessage,
+  }) {
+    return PendingShareItem(
+      id: id,
+      url: url,
+      status: status ?? this.status,
+      addedAt: addedAt,
+      media: media ?? this.media,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }

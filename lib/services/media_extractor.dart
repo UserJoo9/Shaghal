@@ -98,6 +98,8 @@ class MediaExtractor {
       final video = await yt.videos.get(videoId);
       StreamManifest manifest;
       try {
+        manifest = await yt.videos.streams.getManifest(videoId);
+      } catch (_) {
         manifest = await yt.videos.streams.getManifest(
           videoId,
           ytClients: [
@@ -106,12 +108,14 @@ class MediaExtractor {
             YoutubeApiClient.mweb,
           ],
         );
-      } catch (_) {
-        manifest = await yt.videos.streams.getManifest(videoId);
       }
 
       final audioStreams = manifest.audioOnly.toList()
         ..sort((a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond));
+
+      final muxedStreams = manifest.muxed.toList()
+        ..sort((a, b) => b.videoResolution.height.compareTo(a.videoResolution.height));
+      final bestMuxedFallback = muxedStreams.firstOrNull;
 
       final bestM4a = audioStreams
           .where((a) => a.container.name.toLowerCase() == 'mp4' ||
@@ -135,7 +139,7 @@ class MediaExtractor {
       for (final v in manifest.muxed) {
         final h = v.videoResolution.height;
         final fps = v.framerate.framesPerSecond.round();
-        final key = '${h}_$fps';
+        final key = '${h}_${fps >= 50 ? fps : 0}';
         bestByRes[key] = (
           stream: v,
           height: h,
@@ -149,7 +153,7 @@ class MediaExtractor {
       for (final v in manifest.videoOnly) {
         final h = v.videoResolution.height;
         final fps = v.framerate.framesPerSecond.round();
-        final key = '${h}_$fps';
+        final key = '${h}_${fps >= 50 ? fps : 0}';
         final existing = bestByRes[key];
 
         if (existing == null) {
@@ -218,6 +222,7 @@ class MediaExtractor {
           url: v.url.toString(),
           ytVideoStream: v,
           ytAudioStream: audioPair,
+          ytMuxedFallback: isMuxed ? null : bestMuxedFallback,
         ));
       }
 
@@ -247,6 +252,7 @@ class MediaExtractor {
           sizeBytes: a.size.totalBytes,
           url: a.url.toString(),
           ytAudioStream: a,
+          ytMuxedFallback: bestMuxedFallback,
         ));
       }
 

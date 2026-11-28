@@ -7,6 +7,7 @@ final class ShaghalBridge: NSObject {
   private static let channelName = "com.yalkhodary.shaghal/native"
   private static let appGroup = "group.com.yalkhodary.shaghal"
   private static let sharedKey = "pending_shared_url"
+  private static let sharedQueueKey = "pending_shared_urls"
 
   private static var instance: ShaghalBridge?
   private let channel: FlutterMethodChannel
@@ -28,8 +29,9 @@ final class ShaghalBridge: NSObject {
       object: nil,
       queue: .main
     ) { [weak self] _ in
-      if let url = self?.popSharedUrl() {
-        self?.channel.invokeMethod("onSharedUrl", arguments: url)
+      let urls = self?.popSharedUrls() ?? []
+      if !urls.isEmpty {
+        self?.channel.invokeMethod("onSharedUrls", arguments: urls)
       }
     }
   }
@@ -40,18 +42,38 @@ final class ShaghalBridge: NSObject {
     }
   }
 
-  private func popSharedUrl() -> String? {
-    guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return nil }
-    guard let url = defaults.string(forKey: Self.sharedKey), !url.isEmpty else { return nil }
-    defaults.removeObject(forKey: Self.sharedKey)
-    defaults.synchronize()
-    return url
+  private func popSharedUrls() -> [String] {
+    guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return [] }
+    var urls: [String] = []
+    if let list = defaults.stringArray(forKey: Self.sharedQueueKey) {
+      for item in list {
+        let clean = item.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !clean.isEmpty && !urls.contains(clean) {
+          urls.append(clean)
+        }
+      }
+    }
+    if let single = defaults.string(forKey: Self.sharedKey) {
+      let clean = single.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !clean.isEmpty && !urls.contains(clean) {
+        urls.append(clean)
+      }
+    }
+    if !urls.isEmpty {
+      defaults.removeObject(forKey: Self.sharedQueueKey)
+      defaults.removeObject(forKey: Self.sharedKey)
+      defaults.synchronize()
+    }
+    return urls
   }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "consumePendingSharedUrls":
+      result(popSharedUrls())
+
     case "consumePendingSharedUrl":
-      result(popSharedUrl())
+      result(popSharedUrls().first)
 
     case "muxVideoAndAudio":
       guard let args = call.arguments as? [String: Any],

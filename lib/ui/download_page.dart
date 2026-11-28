@@ -88,14 +88,22 @@ class _DownloadBodyState extends ConsumerState<DownloadBody> {
     }
   }
 
-  Future<void> _openQualitySheet(ExtractedMedia media) async {
+  Future<void> _openQualitySheet(
+    ExtractedMedia media, {
+    String? stepLabel,
+    bool showToast = true,
+  }) async {
     final s = ref.read(stringsProvider);
     final res = await showModalBottomSheet<
         ({MediaFormatOption option, String folder})>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _QualityAndFolderSheet(media: media),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (_) => _QualityAndFolderSheet(
+        media: media,
+        stepLabel: stepLabel,
+      ),
     );
     if (res == null || !mounted) return;
 
@@ -104,14 +112,78 @@ class _DownloadBodyState extends ConsumerState<DownloadBody> {
           sourceUrl: media.sourceUrl,
           option: res.option,
           targetFolder: res.folder,
+          thumbnailUrl: media.thumbnailUrl,
+          author: media.author,
         );
     setState(() => _mode = 0);
-    _showToast(
-      s.t(
-        'بدأ التحميل في ${res.folder == kDownloadsFolder ? 'التحميلات' : res.folder}',
-        'Started downloading to ${res.folder == kDownloadsFolder ? 'Downloads' : res.folder}',
-      ),
-    );
+    if (showToast) {
+      _showToast(
+        s.t(
+          'بدأ التحميل في ${res.folder == kDownloadsFolder ? 'التحميلات' : res.folder}',
+          'Started downloading to ${res.folder == kDownloadsFolder ? 'Downloads' : res.folder}',
+        ),
+      );
+    }
+  }
+
+  Future<void> _configurePendingQueue({String? startId}) async {
+    final s = ref.read(stringsProvider);
+    var queuedAny = 0;
+
+    while (mounted) {
+      final list = ref.read(pendingSharesProvider);
+      final readyList = list
+          .where((i) =>
+              i.status == PendingShareStatus.ready &&
+              i.media != null &&
+              !i.media!.needsBrowserSniff &&
+              i.media!.options.isNotEmpty)
+          .toList();
+      if (readyList.isEmpty) break;
+
+      final current = startId != null
+          ? (readyList.where((i) => i.id == startId).firstOrNull ?? readyList.first)
+          : readyList.first;
+      startId = null;
+
+      final media = current.media!;
+      final totalLeft = readyList.length;
+      final res = await showModalBottomSheet<
+          ({MediaFormatOption option, String folder})>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.55),
+        builder: (_) => _QualityAndFolderSheet(
+          media: media,
+          stepLabel: totalLeft > 1
+              ? s.t('متبقي $totalLeft في قائمة الانتظار', '$totalLeft left in queue')
+              : null,
+        ),
+      );
+      if (res == null || !mounted) break;
+
+      ref.read(downloadsProvider.notifier).enqueue(
+            title: media.title,
+            sourceUrl: media.sourceUrl,
+            option: res.option,
+            targetFolder: res.folder,
+            thumbnailUrl: media.thumbnailUrl,
+            author: media.author,
+          );
+      ref.read(pendingSharesProvider.notifier).remove(current.id);
+      queuedAny++;
+    }
+
+    if (queuedAny > 0 && mounted) {
+      setState(() => _mode = 0);
+      _showToast(
+        s.t(
+          'تمت إضافة $queuedAny تحميل إلى القائمة',
+          'Added $queuedAny download(s) to queue',
+        ),
+      );
+    }
   }
 
   void _showToast(String text) {
@@ -174,6 +246,7 @@ class _DownloadBodyState extends ConsumerState<DownloadBody> {
                 urlCtrl: _urlCtrl,
                 analyzing: _analyzing,
                 onAnalyze: () => _analyzeUrl(_urlCtrl.text),
+                onConfigurePending: (id) => _configurePendingQueue(startId: id),
                 onOpenBrowser: (url) => setState(() {
                   _browserInitialUrl = url;
                   _mode = 1;
@@ -244,12 +317,14 @@ class _LinkAndQueueView extends ConsumerWidget {
     required this.urlCtrl,
     required this.analyzing,
     required this.onAnalyze,
+    required this.onConfigurePending,
     required this.onOpenBrowser,
   });
 
   final TextEditingController urlCtrl;
   final bool analyzing;
   final VoidCallback onAnalyze;
+  final Future<void> Function(String? startId) onConfigurePending;
   final void Function(String url) onOpenBrowser;
 
   Future<void> _pasteAndAnalyze(BuildContext context) async {
@@ -264,6 +339,14 @@ class _LinkAndQueueView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final tasks = ref.watch(downloadsProvider);
+    final pendingShares = ref.watch(pendingSharesProvider);
+    final readyCount = pendingShares
+        .where((i) =>
+            i.status == PendingShareStatus.ready &&
+            i.media != null &&
+            !i.media!.needsBrowserSniff &&
+            i.media!.options.isNotEmpty)
+        .length;
     final hasCurrent =
         ref.watch(currentItemProvider.select((v) => v.value != null));
 
@@ -364,6 +447,63 @@ class _LinkAndQueueView extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 18),
+        if (pendingShares.isNotEmpty) ...[
+          Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    s.t(
+                      'روابط مشاركة بانتظار الاختيار (${pendingShares.length})',
+                      'Shared Queue (${pendingShares.length})',
+                    ),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: context.fg70,
+                    ),
+                  ),
+                ),
+              ),
+              if (readyCount > 0)
+                FilledButton.tonal(
+                  onPressed: () => onConfigurePending(null),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    s.t('تجهيز الكل ($readyCount)', 'Configure all ($readyCount)'),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              IconButton(
+                icon: Icon(Icons.clear_all_rounded, size: 20, color: context.fg54),
+                tooltip: s.t('مسح الكل', 'Clear all'),
+                onPressed: () => ref.read(pendingSharesProvider.notifier).clearAll(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final item in pendingShares) ...[
+            _PendingShareTile(
+              item: item,
+              onConfigure: () {
+                final m = item.media;
+                if (m != null && (m.needsBrowserSniff || m.options.isEmpty)) {
+                  ref.read(pendingSharesProvider.notifier).remove(item.id);
+                  onOpenBrowser(MediaExtractor.normalizeUrl(item.url));
+                  return;
+                }
+                onConfigurePending(item.id);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 12),
+        ],
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text(
@@ -394,6 +534,126 @@ class _LinkAndQueueView extends ConsumerWidget {
             const SizedBox(height: 10),
           ],
       ],
+    );
+  }
+}
+
+class _PendingShareTile extends ConsumerWidget {
+  const _PendingShareTile({
+    required this.item,
+    required this.onConfigure,
+  });
+
+  final PendingShareItem item;
+  final VoidCallback onConfigure;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final mgr = ref.read(pendingSharesProvider.notifier);
+    final m = item.media;
+    final needsBrowser = m != null && (m.needsBrowserSniff || m.options.isEmpty);
+
+    return Glass(
+      radius: 22,
+      padding: const EdgeInsets.all(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: item.status == PendingShareStatus.ready ? onConfigure : null,
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: m?.thumbnailUrl != null
+                    ? Image.network(
+                        m!.thumbnailUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          color: context.fgA(0.10),
+                          child: const Icon(Icons.link_rounded, color: Color(0xFF0A84FF)),
+                        ),
+                      )
+                    : Container(
+                        color: context.fgA(0.10),
+                        child: item.status == PendingShareStatus.analyzing
+                            ? const Padding(
+                                padding: EdgeInsets.all(13),
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(
+                                item.status == PendingShareStatus.failed
+                                    ? Icons.error_outline_rounded
+                                    : Icons.link_rounded,
+                                color: item.status == PendingShareStatus.failed
+                                    ? const Color(0xFFFF453A)
+                                    : const Color(0xFF0A84FF),
+                              ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    m?.title ?? item.url,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    switch (item.status) {
+                      PendingShareStatus.analyzing =>
+                        s.t('جاري جلب الجودات...', 'Fetching qualities...'),
+                      PendingShareStatus.ready => needsBrowser
+                          ? s.t('اضغط للفتح في المتصفح الداخلي', 'Tap to open in Browser')
+                          : s.t(
+                              '${m!.videoOptions.length} فيديو · ${m.audioOptions.length} صوت — اضغط للاختيار',
+                              '${m.videoOptions.length} video · ${m.audioOptions.length} audio — tap to pick',
+                            ),
+                      PendingShareStatus.failed =>
+                        s.t('تعذّر التحليل — اضغط إعادة', 'Failed — tap retry'),
+                    },
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: item.status == PendingShareStatus.failed
+                          ? const Color(0xFFFF453A)
+                          : (item.status == PendingShareStatus.ready
+                              ? const Color(0xFF64B5FF)
+                              : context.fg54),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (item.status == PendingShareStatus.failed)
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                onPressed: () => mgr.retry(item.id),
+              )
+            else if (item.status == PendingShareStatus.ready)
+              IconButton(
+                icon: Icon(
+                  needsBrowser ? Icons.open_in_browser_rounded : Icons.tune_rounded,
+                  color: const Color(0xFF0A84FF),
+                  size: 20,
+                ),
+                onPressed: onConfigure,
+              ),
+            IconButton(
+              icon: Icon(Icons.close_rounded, size: 19, color: context.fg54),
+              onPressed: () => mgr.remove(item.id),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -953,8 +1213,9 @@ class _InternalBrowserViewState extends ConsumerState<_InternalBrowserView> {
 // ───────────────────────── نافذة اختيار الجودة والفولدر ─────────────────────────
 
 class _QualityAndFolderSheet extends ConsumerStatefulWidget {
-  const _QualityAndFolderSheet({required this.media});
+  const _QualityAndFolderSheet({required this.media, this.stepLabel});
   final ExtractedMedia media;
+  final String? stepLabel;
 
   @override
   ConsumerState<_QualityAndFolderSheet> createState() =>
@@ -1038,9 +1299,8 @@ class _QualityAndFolderSheetState
         initialChildSize: 0.82,
         minChildSize: 0.5,
         maxChildSize: 0.95,
-        builder: (ctx, scrollCtrl) => Glass(
+        builder: (ctx, scrollCtrl) => GlassSheet(
           radius: 30,
-          padding: EdgeInsets.zero,
           child: Material(
             type: MaterialType.transparency,
             child: Column(
@@ -1059,6 +1319,24 @@ class _QualityAndFolderSheetState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (widget.stepLabel != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0A84FF).withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            widget.stepLabel!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF64B5FF),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
                       Text(
                         widget.media.title,
                         maxLines: 2,

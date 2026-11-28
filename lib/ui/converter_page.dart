@@ -129,6 +129,7 @@ class _ConverterBodyState extends ConsumerState<ConverterBody> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (_) => _MultiFilePickerSheet(
         items: candidates,
         initialPaths: {for (final f in _selectedFiles) f.path},
@@ -887,9 +888,8 @@ class _MultiFilePickerSheetState extends ConsumerState<_MultiFilePickerSheet> {
         initialChildSize: 0.8,
         minChildSize: 0.5,
         maxChildSize: 0.95,
-        builder: (ctx, scrollCtrl) => Glass(
+        builder: (ctx, scrollCtrl) => GlassSheet(
           radius: 30,
-          padding: EdgeInsets.zero,
           child: Material(
             type: MaterialType.transparency,
             child: Column(

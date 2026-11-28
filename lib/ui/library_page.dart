@@ -1,8 +1,15 @@
+import 'dart:io';
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:liquid_design/liquid_design.dart'
-    show LiquidGlassNavigationBar, LiquidGlassNavItem, LiquidGlassStyle;
+    show
+        LiquidGlass,
+        LiquidGlassFallback,
+        LiquidGlassShape,
+        LiquidGlassStyle;
 import 'package:path/path.dart' as p;
 
 import '../models/media_item.dart';
@@ -56,12 +63,12 @@ class LibraryPage extends ConsumerWidget {
                   Expanded(
                     child: _TabSwitcher(
                       index: switch (kindTab) {
-                        KindFilter.video => 1,
+                        KindFilter.settings => 0,
+                        KindFilter.converter => 1,
                         KindFilter.download => 2,
-                        KindFilter.converter => 3,
-                        KindFilter.favorites => 4,
-                        KindFilter.settings => 5,
-                        _ => 0,
+                        KindFilter.favorites => 3,
+                        KindFilter.video => 4,
+                        _ => 5,
                       },
                       child: kindTab == KindFilter.settings
                           ? const _SettingsBody()
@@ -132,10 +139,9 @@ class _TabSwitcherState extends State<_TabSwitcher> {
 
   @override
   Widget build(BuildContext context) {
-    final rtl = Directionality.of(context) == TextDirection.rtl;
-    // +1 = الجديد داخل من نهاية الشاشة (التاب الأعلى ترتيباً)
+    // التابات ثابتة على الشاشة (الشمال 0..2 واليمين 3..5) فالاتجاه دايماً أفقي ثابت.
     final forward = widget.index >= _prev;
-    final dir = (forward ? 1.0 : -1.0) * (rtl ? -1.0 : 1.0);
+    final dir = forward ? 1.0 : -1.0;
     final current = ValueKey<int>(widget.index);
 
     return AnimatedSwitcher(
@@ -191,7 +197,8 @@ class _BottomFade extends StatelessWidget {
   }
 }
 
-/// شريط التابات الزجاجي. المؤشر بينزلق بين التابات بحركة ارتداد خفيفة زي تطبيقات النظام.
+/// شريط التابات الزجاجي: التابات الأساسية (المفضلة · الفيديو · المزيكا)
+/// + زرار دائري منسدل لفوق للتحميل والتحويل والإعدادات.
 class _NavBar extends ConsumerStatefulWidget {
   const _NavBar();
 
@@ -200,51 +207,262 @@ class _NavBar extends ConsumerStatefulWidget {
 }
 
 class _NavBarState extends ConsumerState<_NavBar> {
-  // التاب المختار محلياً: بيتحدّث فوراً عشان العدسة تستقر مكانها من غير ما تستنى
-  // إعادة بناء الصفحة التقيلة.
-  int? _local;
+  KindFilter? _pending;
   int _token = 0;
+
+  void _select(KindFilter target) {
+    HapticFeedback.selectionClick();
+    final my = ++_token;
+    setState(() => _pending = target);
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (!mounted || my != _token) return;
+      ref.read(kindFilterProvider.notifier).set(target);
+      setState(() => _pending = null);
+    });
+  }
+
+  Future<void> _openExtraMenu(
+    BuildContext context,
+    S s,
+    KindFilter active,
+    List<(IconData, String, KindFilter)> items,
+  ) {
+    final bottomPad = MediaQuery.paddingOf(context).bottom + 84;
+    return showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'extra_tabs',
+      barrierColor: Colors.black38,
+      transitionDuration: const Duration(milliseconds: 340),
+      transitionBuilder: (ctx, anim, _, child) => child,
+      pageBuilder: (ctx, animation, _) {
+        final t = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final fade = CurvedAnimation(
+          parent: animation,
+          curve: const Interval(0.25, 1.0, curve: Curves.easeOut),
+          reverseCurve: const Interval(0.0, 0.6),
+        );
+        final sheetBg = ctx.isDark
+            ? const Color(0xEB16161C)
+            : const Color(0xF2F7F7FA);
+
+        return Rtl(
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(12, 0, 12, bottomPad),
+              child: AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) {
+                  final k = (0.18 + 0.82 * t.value).clamp(0.0, 1.06);
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: sheetBg,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: context.fgA(0.16),
+                            width: 0.6,
+                          ),
+                        ),
+                        child: Align(
+                          alignment: Alignment.bottomLeft,
+                          widthFactor: k,
+                          heightFactor: k,
+                          child: Opacity(
+                            opacity: fade.value,
+                            child: SizedBox(width: 224, child: child),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final item in items)
+                          _MenuItem(
+                            item.$2,
+                            icon: item.$1,
+                            checked: active == item.$3,
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              _select(item.$3);
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final kind = ref.watch(kindFilterProvider);
+    final KindFilter current = ref.watch(kindFilterProvider);
+    final KindFilter kind = _pending ?? current;
     final s = ref.watch(stringsProvider);
 
-    final tabs = <(IconData, String, KindFilter)>[
-      (Icons.music_note_rounded, s.t('المزيكا', 'Music'), KindFilter.audio),
-      (Icons.videocam_rounded, s.t('الفيديو', 'Videos'), KindFilter.video),
-      (Icons.download_rounded, s.t('تحميل', 'Download'), KindFilter.download),
-      (Icons.transform_rounded, s.t('تحويل', 'Convert'), KindFilter.converter),
-      (Icons.favorite_rounded, s.t('المفضلة', 'Favs'), KindFilter.favorites),
+    final extraTabs = <(IconData, String, KindFilter)>[
+      (Icons.download_rounded, s.t('التحميل', 'Download'), KindFilter.download),
+      (Icons.transform_rounded, s.t('التحويل', 'Convert'), KindFilter.converter),
       (Icons.settings_rounded, s.t('الإعدادات', 'Settings'), KindFilter.settings),
     ];
-    final providerIndex = tabs.indexWhere((t) => t.$3 == kind);
-    final index = _local ?? (providerIndex < 0 ? 0 : providerIndex);
+    final mainTabs = <(IconData, String, KindFilter)>[
+      (Icons.favorite_rounded, s.t('المفضلة', 'Favs'), KindFilter.favorites),
+      (Icons.videocam_rounded, s.t('الفيديو', 'Videos'), KindFilter.video),
+      (Icons.music_note_rounded, s.t('المزيكا', 'Music'), KindFilter.audio),
+    ];
 
-    // شريط التابات الجاهز من مكتبة liquid_design (النسخة الأصلية): زجاج نيتيف + عدسة بتتسحب
-    // بالصباع. نفس عرض المشغل (هامش 12 من الجنبين).
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: LiquidGlassNavigationBar(
-        height: 68,
-        currentIndex: index,
-        activeColor: context.fg,
-        inactiveColor: context.fg54,
-        items: [
-          for (final t in tabs)
-            LiquidGlassNavItem(icon: Icon(t.$1), label: t.$2),
-        ],
-        onTap: (i) {
-          HapticFeedback.selectionClick();
-          final my = ++_token;
-          setState(() => _local = i);
-          // نأجّل تبديل المحتوى لحد ما حركة المؤشر تخلص، فالانتقال يبقى ناعم.
-          Future.delayed(const Duration(milliseconds: 260), () {
-            if (!mounted || my != _token) return;
-            ref.read(kindFilterProvider.notifier).set(tabs[i].$3);
-            setState(() => _local = null);
-          });
-        },
+    final effective = kind == KindFilter.all ? KindFilter.audio : kind;
+    final mainIdx = mainTabs.indexWhere((t) => t.$3 == effective);
+    final extraIdx = extraTabs.indexWhere((t) => t.$3 == effective);
+    final extraActive = extraIdx >= 0;
+
+    // الاتجاه دايماً LTR: زرار القائمة المنسدلة على الشمال، والتابات الأساسية على اليمين.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            GlassIconButton(
+              icon: extraActive
+                  ? extraTabs[extraIdx].$1
+                  : Icons.apps_rounded,
+              size: 66,
+              iconSize: 26,
+              tint: extraActive ? const Color(0xFF0A84FF) : null,
+              onPressed: () => _openExtraMenu(context, s, effective, extraTabs),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _GlassTabGroup(
+                tabs: mainTabs,
+                selectedIndex: mainIdx < 0 ? null : mainIdx,
+                onTap: (i) => _select(mainTabs[i].$3),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassTabGroup extends StatelessWidget {
+  const _GlassTabGroup({
+    required this.tabs,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  final List<(IconData, String, KindFilter)> tabs;
+  final int? selectedIndex;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const height = 66.0;
+    const pad = 4.0;
+
+    return LiquidGlass(
+      shape: const LiquidGlassShape.capsule(),
+      interactive: true,
+      fallback: LiquidGlassFallback.frosted,
+      fallbackBlurSigma: 22,
+      child: SizedBox(
+        height: height,
+        child: Padding(
+          padding: const EdgeInsets.all(pad),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final itemW = constraints.maxWidth / tabs.length;
+              final active = selectedIndex != null;
+              final idx = selectedIndex ?? 0;
+
+              return Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    left: idx * itemW,
+                    top: 0,
+                    bottom: 0,
+                    width: itemW,
+                    child: IgnorePointer(
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 160),
+                        opacity: active ? 1 : 0,
+                        child: DecoratedBox(
+                          decoration: ShapeDecoration(
+                            shape: const StadiumBorder(),
+                            color: context.fg.withValues(alpha: 0.12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      for (var i = 0; i < tabs.length; i++)
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => onTap(i),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  tabs[i].$1,
+                                  size: 23,
+                                  color: selectedIndex == i
+                                      ? context.fg
+                                      : context.fg54,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  tabs[i].$2,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.fade,
+                                  softWrap: false,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: selectedIndex == i
+                                        ? context.fg
+                                        : context.fg54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -259,6 +477,7 @@ enum _Act {
   kindVideo,
   importFiles,
   importFolder,
+  moveFiles,
   refresh,
 }
 
@@ -364,6 +583,8 @@ class _Header extends ConsumerWidget {
           _import(context, s, lib.importFiles);
         case _Act.importFolder:
           _import(context, s, lib.importFolder);
+        case _Act.moveFiles:
+          _openMultiMoveSheet(context, ref, s);
         case _Act.refresh:
           lib.refresh();
       }
@@ -564,6 +785,9 @@ Future<void> _showMenu(
                         _MenuItem(s.t('استيراد فولدر', 'Import folder'),
                             icon: Icons.create_new_folder_rounded,
                             onTap: () => pick(_Act.importFolder)),
+                        _MenuItem(s.t('نقل ملفات لفولدر', 'Move files'),
+                            icon: Icons.drive_file_move_rounded,
+                            onTap: () => pick(_Act.moveFiles)),
                         _MenuItem(s.t('تحديث', 'Refresh'),
                             icon: Icons.refresh_rounded,
                             onTap: () => pick(_Act.refresh)),
@@ -996,7 +1220,19 @@ class FolderPage extends ConsumerWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
+                        GlassIconButton(
+                          icon: Icons.drive_file_move_rounded,
+                          size: 46,
+                          iconSize: 22,
+                          onPressed: () => _openMultiMoveSheet(
+                            context,
+                            ref,
+                            s,
+                            folderFilter: path,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         // إضافة ملفات جوّه الفولدر ده بالذات
                         GlassIconButton(
                           icon: Icons.add_rounded,
@@ -1034,9 +1270,15 @@ class FolderPage extends ConsumerWidget {
 
 /// صف مسطّح بأسلوب iOS: من غير كروت، فاصل رفيع، وتظليل خفيف للصف الشغّال.
 class _FlatRow extends StatelessWidget {
-  const _FlatRow({required this.child, required this.onTap, this.active = false});
+  const _FlatRow({
+    required this.child,
+    required this.onTap,
+    this.onLongPress,
+    this.active = false,
+  });
   final Widget child;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final bool active;
 
   @override
@@ -1054,6 +1296,7 @@ class _FlatRow extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
+              onLongPress: onLongPress,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                 child: child,
@@ -1204,6 +1447,533 @@ class _SectionList extends ConsumerWidget {
   }
 }
 
+Future<bool> _confirmDeleteDialog(BuildContext context, S s, MediaItem item) async {
+  final res = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => Rtl(
+      child: AlertDialog(
+        title: Text(s.t('تأكيد الحذف', 'Confirm Delete')),
+        content: Text(
+          s.t(
+            'هل أنت متأكد من حذف «${item.name}» نهائياً من الجهاز؟',
+            'Are you sure you want to permanently delete "${item.name}" from your device?',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(s.t('إلغاء', 'Cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFF453A),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(s.t('حذف', 'Delete')),
+          ),
+        ],
+      ),
+    ),
+  );
+  return res == true;
+}
+
+Future<void> _deleteItemConfirmed(
+  BuildContext context,
+  WidgetRef ref,
+  S s,
+  MediaItem item,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  await ref.read(libraryProvider.notifier).deleteItem(item);
+  _toast(messenger, s.t('تم حذف ${item.name}', 'Deleted ${item.name}'));
+}
+
+Future<void> _moveItemsToFolder(
+  BuildContext context,
+  WidgetRef ref,
+  S s,
+  List<MediaItem> items,
+) async {
+  if (items.isEmpty) return;
+  final currentFolders = {for (final i in items) i.folder};
+  final singleCurrent = currentFolders.length == 1 ? currentFolders.first : null;
+  final folders = await listLibraryFolders();
+  if (!context.mounted) return;
+
+  final dest = await showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.55),
+    builder: (_) => _MoveFolderSheet(
+      initialFolders: folders,
+      currentFolder: singleCurrent,
+      count: items.length,
+    ),
+  );
+  if (dest == null || !context.mounted) return;
+
+  final messenger = ScaffoldMessenger.of(context);
+  final moved = await ref.read(libraryProvider.notifier).moveItems(items, dest);
+  if (moved > 0) {
+    final destLabel = dest.isEmpty
+        ? s.t('المجلد الرئيسي', 'Main folder')
+        : (dest == kDownloadsFolder ? s.t('التحميلات', 'Downloads') : dest);
+    _toast(
+      messenger,
+      s.t('تم نقل $moved ملف إلى $destLabel', 'Moved $moved file(s) to $destLabel'),
+    );
+  }
+}
+
+Future<void> _openMultiMoveSheet(
+  BuildContext context,
+  WidgetRef ref,
+  S s, {
+  String? folderFilter,
+}) async {
+  final all = ref.read(libraryProvider).value ?? const <MediaItem>[];
+  final kind = ref.read(kindFilterProvider);
+  final candidates = all.where((i) {
+    if (kind == KindFilter.audio && i.isVideo) return false;
+    if (kind == KindFilter.video && !i.isVideo) return false;
+    if (folderFilter != null && folderFilter.isNotEmpty) {
+      return i.folder == folderFilter ||
+          i.folder.startsWith('$folderFilter/') ||
+          i.folder.startsWith('$folderFilter\\');
+    }
+    return true;
+  }).toList()
+    ..sort((a, b) => naturalCompare(a.name, b.name));
+
+  if (candidates.isEmpty) {
+    _toast(ScaffoldMessenger.of(context), s.t('مفيش ملفات متاحة للنقل', 'No files to move'));
+    return;
+  }
+
+  final picked = await showModalBottomSheet<List<MediaItem>>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.55),
+    builder: (_) => _MultiSelectMoveSheet(items: candidates),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await _moveItemsToFolder(context, ref, s, picked);
+}
+
+Future<void> _showTrackActions(
+  BuildContext context,
+  WidgetRef ref,
+  S s,
+  MediaItem item,
+) async {
+  final act = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.55),
+    builder: (ctx) => Rtl(
+      child: GlassSheet(
+        radius: 28,
+        child: SafeArea(
+          top: false,
+          child: Material(
+            type: MaterialType.transparency,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: ctx.fg38,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 10),
+                  ListTile(
+                    leading: const Icon(Icons.drive_file_move_rounded),
+                    title: Text(s.t('نقل إلى فولدر آخر', 'Move to folder')),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    onTap: () => Navigator.of(ctx).pop('move'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.checklist_rounded),
+                    title: Text(s.t('تحديد عدة ملفات ونقلها', 'Select multiple to move')),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    onTap: () => Navigator.of(ctx).pop('multi'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.delete_rounded, color: Color(0xFFFF453A)),
+                    title: Text(
+                      s.t('حذف الملف', 'Delete file'),
+                      style: const TextStyle(color: Color(0xFFFF453A)),
+                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    onTap: () => Navigator.of(ctx).pop('delete'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  if (!context.mounted || act == null) return;
+  if (act == 'move') {
+    await _moveItemsToFolder(context, ref, s, [item]);
+  } else if (act == 'multi') {
+    await _openMultiMoveSheet(
+      context,
+      ref,
+      s,
+      folderFilter: item.folder.isEmpty ? null : item.folder,
+    );
+  } else if (act == 'delete') {
+    final ok = await _confirmDeleteDialog(context, s, item);
+    if (ok && context.mounted) {
+      await _deleteItemConfirmed(context, ref, s, item);
+    }
+  }
+}
+
+class _MoveFolderSheet extends ConsumerStatefulWidget {
+  const _MoveFolderSheet({
+    required this.initialFolders,
+    required this.currentFolder,
+    required this.count,
+  });
+
+  final List<String> initialFolders;
+  final String? currentFolder;
+  final int count;
+
+  @override
+  ConsumerState<_MoveFolderSheet> createState() => _MoveFolderSheetState();
+}
+
+class _MoveFolderSheetState extends ConsumerState<_MoveFolderSheet> {
+  late final List<String> _folders = [...widget.initialFolders];
+
+  Future<void> _createFolder(S s) async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Rtl(
+        child: AlertDialog(
+          title: Text(s.t('اسم الفولدر الجديد', 'New folder name')),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: s.t('مثلاً: عمرو دياب أو أفلام', 'e.g. Artist or Clips'),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(s.t('إلغاء', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: Text(s.t('إنشاء ونقل', 'Create & Move')),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+    if (name == null || name.isEmpty || !mounted) return;
+    final clean = name.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '').trim();
+    if (clean.isEmpty) return;
+    final root = await libraryRootPath();
+    await Directory(p.join(root, clean)).create(recursive: true);
+    if (mounted) Navigator.of(context).pop(clean);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
+    final options = <(String, String, IconData)>[
+      ('', s.t('المجلد الرئيسي', 'Main folder'), Icons.home_rounded),
+      (kDownloadsFolder, s.t('التحميلات', 'Downloads'), Icons.download_rounded),
+      for (final f in _folders)
+        if (f != kDownloadsFolder) (f, f, Icons.folder_rounded),
+    ];
+
+    return Rtl(
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (ctx, scrollCtrl) => GlassSheet(
+          radius: 30,
+          child: Material(
+            type: MaterialType.transparency,
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.fg38,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 12, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          s.t(
+                            'نقل ${widget.count} ملف إلى...',
+                            'Move ${widget.count} file(s) to...',
+                          ),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _createFolder(s),
+                        icon: const Icon(Icons.create_new_folder_rounded, size: 18),
+                        label: Text(s.t('فولدر جديد', 'New folder')),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollCtrl,
+                    padding: EdgeInsets.fromLTRB(
+                      12,
+                      4,
+                      12,
+                      20 + MediaQuery.paddingOf(context).bottom,
+                    ),
+                    itemCount: options.length,
+                    itemBuilder: (context, index) {
+                      final opt = options[index];
+                      final isCurrent = widget.currentFolder == opt.$1;
+                      return ListTile(
+                        leading: Icon(
+                          opt.$3,
+                          color: isCurrent ? context.fg38 : const Color(0xFF0A84FF),
+                        ),
+                        title: Text(
+                          opt.$2,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: isCurrent ? context.fg54 : context.fg,
+                          ),
+                        ),
+                        trailing: isCurrent
+                            ? Text(
+                                s.t('الحالي', 'Current'),
+                                style: TextStyle(fontSize: 12, color: context.fg38),
+                              )
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        onTap: isCurrent
+                            ? null
+                            : () => Navigator.of(context).pop(opt.$1),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MultiSelectMoveSheet extends ConsumerStatefulWidget {
+  const _MultiSelectMoveSheet({required this.items});
+  final List<MediaItem> items;
+
+  @override
+  ConsumerState<_MultiSelectMoveSheet> createState() =>
+      _MultiSelectMoveSheetState();
+}
+
+class _MultiSelectMoveSheetState extends ConsumerState<_MultiSelectMoveSheet> {
+  final Set<String> _picked = {};
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
+    final filtered = _query.trim().isEmpty
+        ? widget.items
+        : widget.items
+            .where((i) =>
+                i.name.toLowerCase().contains(_query.trim().toLowerCase()))
+            .toList();
+
+    return Rtl(
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (ctx, scrollCtrl) => GlassSheet(
+          radius: 30,
+          child: Material(
+            type: MaterialType.transparency,
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.fg38,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          s.t(
+                            'تحديد ملفات للنقل (${_picked.length})',
+                            'Select files to move (${_picked.length})',
+                          ),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            if (_picked.length == filtered.length) {
+                              _picked.clear();
+                            } else {
+                              _picked.addAll(filtered.map((e) => e.path));
+                            }
+                          });
+                        },
+                        child: Text(_picked.length == filtered.length
+                            ? s.t('إلغاء الكل', 'Clear')
+                            : s.t('تحديد الكل', 'Select all')),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    onChanged: (v) => setState(() => _query = v),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: s.t('بحث...', 'Search...'),
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: true,
+                      fillColor: context.fgA(0.06),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollCtrl,
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final item = filtered[index];
+                      final checked = _picked.contains(item.path);
+                      return CheckboxListTile(
+                        value: checked,
+                        onChanged: (_) => setState(() {
+                          if (!checked) {
+                            _picked.add(item.path);
+                          } else {
+                            _picked.remove(item.path);
+                          }
+                        }),
+                        title: Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          '${item.ext} · ${item.folder.isEmpty ? s.t('الرئيسي', 'Main') : item.folder}',
+                          style: TextStyle(fontSize: 12, color: context.fg54),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    8,
+                    16,
+                    14 + MediaQuery.paddingOf(context).bottom,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _picked.isEmpty
+                          ? null
+                          : () {
+                              final selected = widget.items
+                                  .where((i) => _picked.contains(i.path))
+                                  .toList();
+                              Navigator.of(context).pop(selected);
+                            },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0A84FF),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.drive_file_move_rounded),
+                      label: Text(
+                        s.t('نقل (${_picked.length})', 'Move (${_picked.length})'),
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TrackTile extends ConsumerWidget {
   const _TrackTile({super.key, required this.item, required this.onTap});
   final MediaItem item;
@@ -1211,6 +1981,8 @@ class _TrackTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
     final active = ref.watch(
       currentItemProvider.select((v) => v.value?.path == item.path),
     );
@@ -1219,70 +1991,116 @@ class _TrackTile extends ConsumerWidget {
       favoritesProvider.select((f) => f.contains(favKey(item))),
     );
 
-    return _FlatRow(
-      active: active,
-      onTap: onTap,
+    final deleteBg = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF453A),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      alignment: Alignment.centerRight,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 56,
-            height: 56,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Artwork(
-                  path: item.path,
-                  size: 56,
-                  radius: 13,
-                  isVideo: item.isVideo,
-                ),
-                if (active)
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(13),
-                      color: Colors.black54,
-                    ),
-                    child: const Icon(Icons.graphic_eq_rounded, color: Colors.white),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    color: active ? const Color(0xFF64B5FF) : context.fg,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${item.ext.toUpperCase()} · ${formatSize(item.size)}',
-                  style: TextStyle(fontSize: 13, color: context.fg54),
-                ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => ref.read(favoritesProvider.notifier).toggle(item),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Icon(
-                fav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                size: 22,
-                color: fav ? const Color(0xFFFF2D55) : context.fg38,
-              ),
+          const Icon(Icons.delete_rounded, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            s.t('حذف', 'Delete'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
+      ),
+    );
+
+    return Dismissible(
+      key: ValueKey('dismiss_${item.path}'),
+      // السحب ناحية الشمال دايماً سواء التطبيق عربي أو إنجليزي
+      direction: isRtl ? DismissDirection.startToEnd : DismissDirection.endToStart,
+      background: deleteBg,
+      secondaryBackground: deleteBg,
+      confirmDismiss: (_) => _confirmDeleteDialog(context, s, item),
+      onDismissed: (_) => _deleteItemConfirmed(context, ref, s, item),
+      child: _FlatRow(
+        active: active,
+        onTap: onTap,
+        onLongPress: () => _showTrackActions(context, ref, s, item),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Artwork(
+                    path: item.path,
+                    size: 56,
+                    radius: 13,
+                    isVideo: item.isVideo,
+                  ),
+                  if (active)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(13),
+                        color: Colors.black54,
+                      ),
+                      child: const Icon(Icons.graphic_eq_rounded, color: Colors.white),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: active ? const Color(0xFF64B5FF) : context.fg,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${item.ext.toUpperCase()} · ${formatSize(item.size)}',
+                    style: TextStyle(fontSize: 13, color: context.fg54),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => ref.read(favoritesProvider.notifier).toggle(item),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(
+                  fav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                  size: 22,
+                  color: fav ? const Color(0xFFFF2D55) : context.fg38,
+                ),
+              ),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _showTrackActions(context, ref, s, item),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 2, 8),
+                child: Icon(
+                  Icons.more_vert_rounded,
+                  size: 20,
+                  color: context.fg38,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

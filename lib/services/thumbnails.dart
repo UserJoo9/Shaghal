@@ -112,4 +112,18 @@ class Thumbnails {
       return null;
     }
   }
+
+  /// يحفظ صورة مصغّرة جاهزة في الكاش لملف لسه نازل.
+  static Future<void> put(String path, Uint8List bytes) async {
+    if (bytes.isEmpty) return;
+    try {
+      final dir = _dir ??= await _cacheDir();
+      final st = File(path).statSync();
+      final key = _key('$path|${st.modified.millisecondsSinceEpoch}|${st.size}');
+      final img = File(p.join(dir.path, '$key.jpg'));
+      final none = File(p.join(dir.path, '$key.none'));
+      if (none.existsSync()) none.deleteSync();
+      await img.writeAsBytes(bytes, flush: true);
+    } catch (_) {}
+  }
 }

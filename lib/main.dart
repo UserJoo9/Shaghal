@@ -10,6 +10,7 @@ import 'package:liquid_design/liquid_design.dart' show LiquidGlassService, Liqui
 import 'package:media_kit/media_kit.dart';
 
 import 'services/audio_handler.dart';
+import 'services/download_manager.dart';
 import 'services/native_bridge.dart';
 import 'state/providers.dart';
 import 'ui/library_page.dart';
@@ -106,9 +107,9 @@ class _ShaghalAppState extends ConsumerState<ShaghalApp> {
   @override
   void initState() {
     super.initState();
-    NativeBridge.instance.initShareListener((url) {
-      if (!mounted) return;
-      ref.read(incomingShareUrlProvider.notifier).set(url);
+    NativeBridge.instance.initShareListener((urls) {
+      if (!mounted || urls.isEmpty) return;
+      ref.read(pendingSharesProvider.notifier).addUrls(urls);
       ref.read(kindFilterProvider.notifier).set(KindFilter.download);
     });
   }

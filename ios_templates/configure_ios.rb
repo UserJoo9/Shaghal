@@ -60,6 +60,13 @@ runner_target.build_configurations.each do |cfg|
   cfg.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
 end
 
+runner_bundle_id = runner_target.build_configurations
+  .map { |c| c.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] }
+  .find { |v| v && !v.empty? } || 'com.yalkhodary.shaghal'
+runner_team = runner_target.build_configurations
+  .map { |c| c.build_settings['DEVELOPMENT_TEAM'] }
+  .find { |v| v && !v.empty? }
+
 unless project.targets.any? { |t| t.name == 'ShareExtension' }
   ext_target = project.new_target(:app_extension, 'ShareExtension', :ios, '15.0')
   ext_group = project.main_group.new_group('ShareExtension', 'ShareExtension')
@@ -70,7 +77,9 @@ unless project.targets.any? { |t| t.name == 'ShareExtension' }
 
   ext_target.build_configurations.each do |cfg|
     bs = cfg.build_settings
-    bs['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.yalkhodary.shaghal.ShareExtension'
+    bs['PRODUCT_BUNDLE_IDENTIFIER'] = "#{runner_bundle_id}.ShareExtension"
+    bs['DEVELOPMENT_TEAM'] = runner_team if runner_team
+    bs['CODE_SIGN_STYLE'] = 'Automatic' if runner_team
     bs['INFOPLIST_FILE'] = 'ShareExtension/Info.plist'
     bs['CODE_SIGN_ENTITLEMENTS'] = 'ShareExtension/ShareExtension.entitlements'
     bs['GENERATE_INFOPLIST_FILE'] = 'NO'

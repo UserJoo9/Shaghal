@@ -13,7 +13,7 @@ class NativeBridge {
   StreamSubscription<Uri>? _linkSub;
   bool _initialized = false;
 
-  Future<void> initShareListener(void Function(String url) onSharedUrl) async {
+  Future<void> initShareListener(void Function(List<String> urls) onSharedUrls) async {
     if (_initialized) return;
     _initialized = true;
 
@@ -21,28 +21,42 @@ class NativeBridge {
       if (uri == null) return;
       final q = uri.queryParameters['url'];
       if (q != null && q.trim().isNotEmpty) {
-        onSharedUrl(q.trim());
+        onSharedUrls([q.trim()]);
         return;
       }
       if (uri.scheme == 'http' || uri.scheme == 'https') {
-        onSharedUrl(uri.toString());
+        onSharedUrls([uri.toString()]);
       }
     }
 
     if (Platform.isIOS) {
       _channel.setMethodCallHandler((call) async {
-        if (call.method == 'onSharedUrl') {
+        if (call.method == 'onSharedUrls') {
+          final arg = call.arguments;
+          if (arg is List) {
+            final urls = arg
+                .whereType<String>()
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList();
+            if (urls.isNotEmpty) onSharedUrls(urls);
+          }
+        } else if (call.method == 'onSharedUrl') {
           final arg = call.arguments;
           if (arg is String && arg.trim().isNotEmpty) {
-            onSharedUrl(arg.trim());
+            onSharedUrls([arg.trim()]);
           }
         }
       });
       try {
         final pending =
-            await _channel.invokeMethod<String>('consumePendingSharedUrl');
-        if (pending != null && pending.trim().isNotEmpty) {
-          onSharedUrl(pending.trim());
+            await _channel.invokeListMethod<String>('consumePendingSharedUrls');
+        final urls = (pending ?? const [])
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        if (urls.isNotEmpty) {
+          onSharedUrls(urls);
         }
       } catch (_) {}
     }

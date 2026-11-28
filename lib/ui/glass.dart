@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -166,6 +167,41 @@ class GlassIconButton extends StatelessWidget {
   }
 }
 
+
+/// سطح زجاجي معتم للـ Bottom Sheets عشان المحتوى اللي ورا ما يظهرش ويشوش على القراءة.
+class GlassSheet extends StatelessWidget {
+  const GlassSheet({
+    super.key,
+    required this.child,
+    this.radius = 30,
+  });
+
+  final Widget child;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = context.isDark
+        ? const Color(0xEB141418)
+        : const Color(0xF2F7F7FA);
+    return ClipRRect(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
+            border: Border(
+              top: BorderSide(color: context.fgA(0.16), width: 0.6),
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
 
 /// بيطبّق اتجاه اللغة الحالية على الصفحة (RTL للعربي، LTR للإنجليزي) من غير ما يقلب
 /// اتجاه التنقل نفسه (عشان سحب الرجوع يفضل من حافة الشمال).

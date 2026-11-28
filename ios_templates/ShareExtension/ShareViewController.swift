@@ -4,11 +4,42 @@ import UIKit
 final class ShareViewController: UIViewController {
   private let appGroup = "group.com.yalkhodary.shaghal"
   private let sharedKey = "pending_shared_url"
+  private let sharedQueueKey = "pending_shared_urls"
   private var handled = false
+  private var queuedCount = 1
+
+  private var statusLabel: UILabel?
 
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .clear
+
+    let card = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterialDark))
+    card.layer.cornerRadius = 24
+    card.clipsToBounds = true
+    card.translatesAutoresizingMaskIntoConstraints = false
+
+    let label = UILabel()
+    label.textColor = .white
+    label.font = .systemFont(ofSize: 15, weight: .semibold)
+    label.numberOfLines = 2
+    label.textAlignment = .center
+    label.text = "جاري الإرسال إلى شغال..."
+    label.translatesAutoresizingMaskIntoConstraints = false
+    statusLabel = label
+
+    card.contentView.addSubview(label)
+    view.addSubview(card)
+
+    NSLayoutConstraint.activate([
+      card.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      card.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+      card.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -48),
+      label.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
+      label.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18),
+      label.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 24),
+      label.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -24),
+    ])
   }
 
   override func viewDidAppear(_ animated: Bool) {
@@ -18,11 +49,23 @@ final class ShareViewController: UIViewController {
     extractSharedUrl { [weak self] urlString in
       guard let self = self else { return }
       if let urlString = urlString, !urlString.isEmpty {
+        let clean = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         if let defaults = UserDefaults(suiteName: self.appGroup) {
-          defaults.set(urlString, forKey: self.sharedKey)
+          var queue = defaults.stringArray(forKey: self.sharedQueueKey) ?? []
+          if let legacy = defaults.string(forKey: self.sharedKey),
+             !legacy.isEmpty,
+             !queue.contains(legacy) {
+            queue.append(legacy)
+          }
+          defaults.removeObject(forKey: self.sharedKey)
+          if !queue.contains(clean) {
+            queue.append(clean)
+          }
+          defaults.set(queue, forKey: self.sharedQueueKey)
           defaults.synchronize()
+          self.queuedCount = queue.count
         }
-        self.openMainApp(with: urlString)
+        self.openMainApp(with: clean)
       } else {
         self.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
       }
@@ -82,24 +125,30 @@ final class ShareViewController: UIViewController {
       return
     }
 
-    var responder: UIResponder? = self
-    let sel = sel_registerName("openURL:")
-    var openedViaResponder = false
-    while let r = responder {
-      if r.responds(to: sel) {
-        r.perform(sel, with: appUrl)
-        openedViaResponder = true
-        break
+    var finished = false
+    func finishExtension() {
+      DispatchQueue.main.async { [weak self] in
+        guard !finished else { return }
+        finished = true
+        self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
       }
-      responder = r.next
     }
-    if openedViaResponder {
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-        self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
-      }
-    } else {
-      extensionContext?.open(appUrl) { [weak self] _ in
-        self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+
+    // iOS 18+ blocks Share Extensions from foregrounding host apps via responder openURL.
+    // Still attempt extensionContext?.open, and show confirmation before closing.
+    extensionContext?.open(appUrl) { [weak self] opened in
+      DispatchQueue.main.async {
+        if opened {
+          finishExtension()
+        } else {
+          let count = self?.queuedCount ?? 1
+          self?.statusLabel?.text = count > 1
+            ? "تمت إضافة الرابط لقائمة الانتظار (\(count)) ✓\nافتح «شغال» لاختيار الجودات"
+            : "تم حفظ الرابط في «شغال» ✓\nافتح التطبيق للتحميل"
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+            finishExtension()
+          }
+        }
       }
     }
   }
